@@ -1,0 +1,14 @@
+{
+  "_meta": {
+    "source": "OpenCRE (https://www.opencre.org)",
+    "generated": "2025-10-21T22:18:15.806Z",
+    "total_asvs_requirements": 20,
+    "requirements_with_mappings": 1,
+    "coverage_percent": "5.0"
+  },
+  "mappings": {
+    "V1.1.1": [
+      "8.25"
+    ]
+  }
+}

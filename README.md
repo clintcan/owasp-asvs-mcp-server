@@ -51,16 +51,58 @@ npm run build
 ```
 owasp-asvs-mcp-server/
 ├── src/
-│   └── index.ts          # Main server code
+│   └── index.ts                 # Main server code
 ├── data/
-│   └── asvs-5.0.0.json   # Local ASVS data (loads 54x faster than remote)
+│   ├── asvs-5.0.0.json          # ASVS 5.0.0 requirements data
+│   ├── asvs-cwe-mapping.json    # Official CWE mappings from OWASP
+│   └── asvs-nist-mapping.json   # Official NIST 800-63B mappings from OWASP
 ├── scripts/
 │   ├── update-asvs-data.js      # Update ASVS data from OWASP
+│   ├── parse-nist-mapping.cjs   # Parse NIST markdown to JSON
 │   └── benchmark-loading.js     # Performance benchmarking tool
-├── dist/                  # Compiled JavaScript (generated)
+├── dist/                         # Compiled JavaScript (generated)
 ├── package.json
 ├── tsconfig.json
 └── README.md
+```
+
+## Data Sources
+
+This MCP server uses **official OWASP ASVS data and mappings**:
+
+### ASVS Requirements
+- **Source**: [OWASP ASVS 5.0.0](https://github.com/OWASP/ASVS)
+- **File**: `data/asvs-5.0.0.json`
+- **Contains**: All security verification requirements with levels (L1, L2, L3)
+
+### CWE Mappings ✅ Official
+- **Source**: [OWASP ASVS 5.0 CWE Mapping](https://github.com/OWASP/ASVS/blob/master/5.0/mappings/v5.0.be_cwe_mapping.json)
+- **File**: `data/asvs-cwe-mapping.json`
+- **Contains**: 214 mappings from ASVS requirements to Common Weakness Enumeration (CWE) IDs
+- **Status**: Official OWASP mapping
+
+### NIST Mappings ✅ Official
+- **Source**: [OWASP ASVS 5.0 NIST Mapping](https://github.com/OWASP/ASVS/blob/master/5.0/mappings/nist.md)
+- **File**: `data/asvs-nist-mapping.json`
+- **Contains**: 52 mappings from ASVS requirements to NIST 800-63B authentication guidelines
+- **Status**: Official OWASP mapping
+
+### Compliance Framework Mappings ⚠️ Illustrative Only
+- **Frameworks**: PCI DSS, HIPAA, GDPR, SOX, ISO 27001
+- **Status**: **Not official** - Illustrative examples for demonstration purposes only
+- **Important**: These mappings are conceptually reasonable but have NOT been validated by OWASP or compliance auditors
+- **Recommendation**: For production compliance work, use [OpenCRE](https://www.opencre.org) or consult qualified compliance professionals
+
+### Updating Data
+
+```bash
+# Update ASVS requirements data
+npm run update-asvs
+
+# Update CWE and NIST mappings (manual)
+curl -o data/asvs-cwe-mapping.json https://raw.githubusercontent.com/OWASP/ASVS/master/5.0/mappings/v5.0.be_cwe_mapping.json
+curl -o data/asvs-nist-mapping.md https://raw.githubusercontent.com/OWASP/ASVS/master/5.0/mappings/nist.md
+node scripts/parse-nist-mapping.cjs
 ```
 
 ## Configuration

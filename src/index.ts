@@ -15,10 +15,14 @@ import fetch from "node-fetch";
 import { readFileSync, statSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { OpenCREClient } from "./opencre-client.js";
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Configuration from environment variables
+const USE_OPENCRE = process.env.ASVS_USE_OPENCRE === 'true'; // Enable OpenCRE ISO 27001 mappings
 
 // Security constants - GENEROUS tier (for trusted/internal use)
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -136,6 +140,7 @@ class ASVSServer {
   private server: Server;
   private asvsData: ASVSCategory[] = [];
   private dataLoaded: boolean = false;
+  private opencreClient: OpenCREClient | null = null;
 
   // Performance indexes for O(1) lookups
   private requirementIndex: Map<string, { requirement: ASVSRequirement; category: ASVSCategory }> = new Map();
@@ -156,13 +161,76 @@ class ASVSServer {
       }
     );
 
+    // Initialize OpenCRE client if enabled
+    if (USE_OPENCRE) {
+      this.opencreClient = new OpenCREClient();
+      console.error("OpenCRE integration enabled - ISO 27001 mappings will be fetched dynamically");
+    } else {
+      console.error("OpenCRE integration disabled - use ASVS_USE_OPENCRE=true to enable ISO 27001 mappings");
+    }
+
     this.setupHandlers();
+  }
+
+  /**
+   * Load official CWE and NIST mappings from OWASP ASVS repository
+   * These are separate mapping files maintained by OWASP
+   */
+  private async loadMappings(): Promise<{ cwe: Record<string, string>; nist: Record<string, string[]> }> {
+    const cweMappings: Record<string, string> = {};
+    const nistMappings: Record<string, string[]> = {};
+
+    try {
+      // Load CWE mappings
+      const cweFilePath = join(__dirname, '..', 'data', 'asvs-cwe-mapping.json');
+      try {
+        const cweContent = readFileSync(cweFilePath, 'utf-8');
+        const cweData = JSON.parse(cweContent);
+
+        // Convert v5.0.be-X.Y.Z format to X.Y.Z and VX.Y.Z formats for lookup
+        for (const [key, value] of Object.entries(cweData)) {
+          const match = key.match(/v5\.0\.be-(.+)/);
+          if (match) {
+            const idWithoutPrefix = match[1]; // e.g., "2.1.1"
+            cweMappings[idWithoutPrefix] = String(value);
+            cweMappings[`V${idWithoutPrefix}`] = String(value); // Also store with "V" prefix
+          }
+        }
+        console.error(`Loaded ${Object.keys(cweMappings).length / 2} CWE mappings from official OWASP source`);
+      } catch (error) {
+        console.error("Failed to load CWE mappings:", error);
+      }
+
+      // Load NIST mappings
+      const nistFilePath = join(__dirname, '..', 'data', 'asvs-nist-mapping.json');
+      try {
+        const nistContent = readFileSync(nistFilePath, 'utf-8');
+        const nistData = JSON.parse(nistContent);
+
+        // Data is in format "X.Y.Z" -> [NIST sections]
+        // Add both with and without "V" prefix for compatibility
+        for (const [key, value] of Object.entries(nistData)) {
+          nistMappings[key] = value as string[];
+          nistMappings[`V${key}`] = value as string[]; // Also store with "V" prefix
+        }
+        console.error(`Loaded ${Object.keys(nistMappings).length / 2} NIST mappings from official OWASP source`);
+      } catch (error) {
+        console.error("Failed to load NIST mappings:", error);
+      }
+    } catch (error) {
+      console.error("Error loading mapping files:", error);
+    }
+
+    return { cwe: cweMappings, nist: nistMappings };
   }
 
   private async loadASVSData(): Promise<void> {
     if (this.dataLoaded) return;
 
     try {
+      // Load CWE and NIST mappings first
+      const mappings = await this.loadMappings();
+
       // Try to load from local file first (much faster!)
       const localFilePath = join(__dirname, '..', 'data', 'asvs-5.0.0.json');
 
@@ -175,7 +243,7 @@ class ASVSServer {
 
         const fileContent = readFileSync(localFilePath, 'utf-8');
         const data = JSON.parse(fileContent);
-        this.asvsData = this.parseASVSData(data);
+        this.asvsData = this.parseASVSData(data, mappings);
         this.dataSource = 'local';
         console.error("ASVS data loaded from local file (fast path)");
       } catch (fileError) {
@@ -197,7 +265,7 @@ class ASVSServer {
         }
 
         const data = await response.json() as any;
-        this.asvsData = this.parseASVSData(data);
+        this.asvsData = this.parseASVSData(data, mappings);
         this.dataSource = 'remote';
         console.error("ASVS data loaded from remote source");
       }
@@ -281,7 +349,12 @@ class ASVSServer {
           ...data,
           _meta: {
             data_source: this.dataSource,
-            version: '4.0.3'
+            version: '5.0.0',
+            mappings: {
+              cwe_source: 'OWASP ASVS 5.0 official CWE mapping',
+              nist_source: 'OWASP ASVS 5.0 official NIST 800-63B mapping',
+              compliance_note: 'Compliance framework mappings (PCI DSS, HIPAA, GDPR, SOX, ISO 27001) are illustrative examples only and not official OWASP mappings. For validated mappings, consult OpenCRE (https://www.opencre.org) or qualified compliance professionals.'
+            }
           }
         }, null, 2)
       }]
@@ -321,7 +394,10 @@ class ASVSServer {
     };
   }
 
-  private parseASVSData(data: any): ASVSCategory[] {
+  private parseASVSData(
+    data: any,
+    mappings?: { cwe: Record<string, string>; nist: Record<string, string[]> }
+  ): ASVSCategory[] {
     // Parse the ASVS JSON structure into our format
     const categories: ASVSCategory[] = [];
 
@@ -342,14 +418,21 @@ class ASVSServer {
         const items = section.Items || section.items || [];
 
         for (const item of items) {
+          const requirementId = item.Shortcode || item.shortcode || item.id || item.req_id || '';
+
+          // Try to get mappings from official OWASP mapping files
+          const cweMapping = mappings?.cwe?.[requirementId];
+          const nistMapping = mappings?.nist?.[requirementId];
+
           allRequirements.push({
-            id: item.Shortcode || item.shortcode || item.id || item.req_id || '',
+            id: requirementId,
             category: categoryName,
             subcategory: sectionName,
             description: item.Description || item.description || item.requirement || '',
             level: this.extractLevels(item),
-            cwe: item.CWE || item.cwe || [],
-            nist: item.NIST || item.nist || []
+            // Use official mappings if available, otherwise check inline data, fallback to empty array
+            cwe: cweMapping ? [`CWE-${cweMapping}`] : (item.CWE || item.cwe || []),
+            nist: nistMapping || (item.NIST || item.nist || [])
           });
         }
       }
