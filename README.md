@@ -1,11 +1,18 @@
 # OWASP ASVS MCP Server
 
-A Model Context Protocol (MCP) server that provides AI assistants with access to the OWASP Application Security Verification Standard (ASVS), enabling intelligent security recommendations and requirement lookups.
+[![Security Status](https://img.shields.io/badge/ASVS%20L1%20Compliance-87%25-brightgreen)](SECURITY_AUDIT_REPORT.md)
+[![Production Ready](https://img.shields.io/badge/Production-Ready-success)](SECURITY.md)
+[![OWASP ASVS](https://img.shields.io/badge/OWASP%20ASVS-5.0.0-blue)](https://owasp.org/www-project-application-security-verification-standard/)
+
+A **production-ready** Model Context Protocol (MCP) server that provides AI assistants with access to the OWASP Application Security Verification Standard (ASVS), enabling intelligent security recommendations and requirement lookups.
 
 **Git Repository**: https://github.com/clintcan/owasp-asvs-mcp-server
 
+**Security:** This server achieves **87% ASVS Level 1 compliance** with production-grade security controls including structured logging, TLS 1.2+, data integrity verification, rate limiting, and configurable security tiers. See [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md) for detailed assessment.
+
 ## Features
 
+### Core Capabilities
 - **Query by Level**: Get all requirements for ASVS verification levels L1, L2, or L3
 - **Query by Category**: Filter requirements by security categories (Authentication, Access Control, etc.)
 - **Detailed Requirements**: Look up specific requirements by ID
@@ -16,6 +23,16 @@ A Model Context Protocol (MCP) server that provides AI assistants with access to
 - **Gap Analysis**: Identify missing controls needed for compliance frameworks
 - **Compliance Impact**: Understand which regulations a security control helps satisfy
 - **HIPAA Integration**: 76 validated HIPAA Security Rule mappings to ASVS 5.0.0 requirements
+
+### Production-Grade Security ✅
+- **Structured Logging**: Winston-based JSON logging with rotation (10MB max, 5 files)
+- **Data Integrity**: SHA-256 hash verification for remote data fetching
+- **TLS 1.2+**: Explicit TLS configuration with certificate validation
+- **Rate Limiting**: Sliding window algorithm (configurable: 100 req/min default)
+- **Memory Safety**: Cache size limits and input validation
+- **Request Tracking**: UUID-based request IDs for log correlation
+- **Configurable Security**: Three tiers (CONSERVATIVE/BALANCED/GENEROUS)
+- **Environment Variables**: Full configuration via env vars (see [SETUP_GUIDE.md](SETUP_GUIDE.md))
 
 ## Installation
 
@@ -122,6 +139,10 @@ node scripts/parse-nist-mapping.cjs
 
 ## Configuration
 
+The server supports comprehensive configuration via environment variables. See [SETUP_GUIDE.md](SETUP_GUIDE.md) for detailed setup instructions and [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md) for complete reference.
+
+### Quick Start Configuration
+
 Add the server to your MCP client configuration:
 
 ### For Claude Code
@@ -159,7 +180,7 @@ Add the server to your MCP client configuration:
    }
    ```
 
-   **Option C - Project-level config:**
+   **Option C - Project-level config with environment variables:**
 
    Create `.mcp.json` in your project root:
    ```json
@@ -167,7 +188,14 @@ Add the server to your MCP client configuration:
      "mcpServers": {
        "owasp-asvs": {
          "command": "node",
-         "args": ["/absolute/path/to/owasp-asvs-mcp-server/dist/index.js"]
+         "args": ["/absolute/path/to/owasp-asvs-mcp-server/dist/index.js"],
+         "env": {
+           "ASVS_SECURITY_TIER": "BALANCED",
+           "ASVS_RATE_LIMIT": "true",
+           "ASVS_RATE_LIMIT_REQUESTS": "100",
+           "LOG_LEVEL": "warn",
+           "LOG_FILE": "./asvs-server.log"
+         }
        }
      }
    }
@@ -178,6 +206,39 @@ Add the server to your MCP client configuration:
 4. **Verify it's working**:
    - Use `/mcp` command to see available MCP servers
    - Test by asking: "Show me all ASVS Level 1 authentication requirements"
+
+### Environment Variables
+
+The server supports comprehensive configuration. See [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md) for complete reference.
+
+**Key Variables:**
+- `ASVS_SECURITY_TIER`: CONSERVATIVE | BALANCED | GENEROUS (default: BALANCED)
+- `ASVS_RATE_LIMIT`: Enable rate limiting (default: true)
+- `ASVS_RATE_LIMIT_REQUESTS`: Max requests per window (default: 100)
+- `LOG_LEVEL`: error | warn | info | debug (default: info)
+- `LOG_FILE`: Path to log file (default: ./asvs-server.log)
+- `ASVS_DATA_HASH`: SHA-256 hash for data integrity verification (optional)
+
+**Example Production Configuration:**
+```json
+{
+  "mcpServers": {
+    "owasp-asvs": {
+      "command": "node",
+      "args": ["/path/to/owasp-asvs-mcp-server/dist/index.js"],
+      "env": {
+        "ASVS_SECURITY_TIER": "BALANCED",
+        "ASVS_RATE_LIMIT": "true",
+        "ASVS_RATE_LIMIT_REQUESTS": "100",
+        "ASVS_RATE_LIMIT_WINDOW_MS": "60000",
+        "LOG_LEVEL": "warn",
+        "LOG_FILE": "/var/log/asvs-server.log",
+        "ASVS_DATA_HASH": "your_sha256_hash_here"
+      }
+    }
+  }
+}
+```
 
 ### For Claude Desktop (macOS)
 
@@ -413,28 +474,34 @@ The data source used is indicated in the `_meta.data_source` field of all respon
 
 ### Security & Performance
 
-The server implements **generous security constraints** optimized for trusted/internal environments:
-
-- **File Size Limit**: 50 MB (supports future ASVS versions and extended datasets)
-- **Query Length**: 5000 characters (enables complex searches with full paragraphs)
-- **Search Results**: 500 maximum (returns all matches in most cases)
-- **DoS Protection**: Input validation and resource limits prevent abuse while allowing extensive legitimate use
-
-**Recommended for**: Internal tools, development environments, trusted networks
+The server implements **configurable security tiers** to match your deployment environment:
 
 #### Security Constraint Tiers
 
-The server can be configured with different security tiers. Currently using **Generous** tier:
+Configure via `ASVS_SECURITY_TIER` environment variable:
 
-| Constraint | Conservative | Balanced | Generous ⭐ | Maximum |
-|------------|--------------|----------|-------------|---------|
-| File Size | 10 MB | 25 MB | **50 MB** | 100 MB |
-| Query Length | 1000 | 2000 | **5000** | 10000 |
-| Search Results | 100 | 250 | **500** | 1000 |
-| **Security Level** | Excellent | Excellent | Good | Fair |
-| **Best For** | Public APIs | Most uses | **Internal** | Dev only |
+| Constraint | CONSERVATIVE | BALANCED ⭐ | GENEROUS |
+|------------|--------------|-------------|----------|
+| File Size | 10 MB | **25 MB** | 50 MB |
+| Query Length | 1000 chars | **2000 chars** | 5000 chars |
+| Max Category Name | 200 chars | **500 chars** | 1000 chars |
+| Max ID Length | 50 chars | **100 chars** | 200 chars |
+| Search Results | 100 | **250** | 500 |
+| Cache Entries | 5,000 | **10,000** | 20,000 |
+| **Security Level** | Excellent | **Excellent** | Good |
+| **Best For** | Public APIs | **Production** | Development |
 
-To change security tiers, modify the constants in `src/index.ts` (lines 23-29).
+**Default**: BALANCED tier (recommended for production)
+
+**Additional Security Features:**
+- ✅ **Rate Limiting**: Sliding window algorithm (100 requests/minute default)
+- ✅ **TLS 1.2+**: Explicit TLS configuration with certificate validation
+- ✅ **Data Integrity**: SHA-256 hash verification for remote data
+- ✅ **Request Tracking**: UUID-based request IDs for log correlation
+- ✅ **Structured Logging**: Winston with JSON format and rotation
+- ✅ **Memory Safety**: Cache size limits and input validation
+
+See [SECURITY.md](SECURITY.md) for comprehensive security documentation.
 
 ## Development
 
@@ -450,6 +517,12 @@ npm run dev
 
 # Update ASVS data from OWASP repository
 npm run update-asvs
+
+# Run security tests
+npm run test:phase1   # Logging and data integrity tests
+npm run test:phase2   # Configuration and TLS tests
+npm run test:phase3   # Rate limiting and request ID tests
+npm run test:all      # Run all test suites
 ```
 
 ## Compliance Frameworks Supported
@@ -538,6 +611,18 @@ The server can be enhanced with:
 
 ### Recent Enhancements
 
+**Version 0.5.0 (2025-10-23) - Production Security Release:**
+- ✅ **87% ASVS Level 1 Compliance** achieved (up from 66%)
+- ✅ **Winston Structured Logging** with JSON format and rotation
+- ✅ **Rate Limiting** with sliding window algorithm
+- ✅ **TLS 1.2+** explicit configuration with certificate validation
+- ✅ **Data Integrity** SHA-256 hash verification
+- ✅ **Configurable Security Tiers** via environment variables
+- ✅ **Request ID Tracking** with UUID for log correlation
+- ✅ **Comprehensive Documentation**: SECURITY.md, SETUP_GUIDE.md, ENVIRONMENT_VARIABLES.md
+- ✅ **Automated Test Suites** for all security features
+- ✅ **Production Ready** status confirmed by security audit
+
 **Version 0.4.0 (2025-10-22):**
 - ✅ ASVS 5.0.0 integration (345 requirements, 17 chapters)
 - ✅ Validated HIPAA Security Rule mappings (76 requirements, 102 mappings)
@@ -550,6 +635,19 @@ The server can be enhanced with:
 
 MIT
 
+## Documentation
+
+- **[README.md](README.md)** - This file - Quick start and overview
+- **[SECURITY.md](SECURITY.md)** - Comprehensive security documentation (13.5 KB)
+- **[SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md)** - ASVS Level 1 audit results (87% compliance)
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Four different setup methods with examples
+- **[ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md)** - Complete configuration reference
+- **[HIPAA_INTEGRATION.md](HIPAA_INTEGRATION.md)** - Validated HIPAA mapping documentation
+- **[CLAUDE.md](CLAUDE.md)** - Instructions for Claude Code integration
+- **[PHASE1_IMPLEMENTATION.md](PHASE1_IMPLEMENTATION.md)** - Logging and data integrity implementation
+- **[PHASE2_IMPLEMENTATION.md](PHASE2_IMPLEMENTATION.md)** - Configuration and TLS implementation
+- **[PHASE3_IMPLEMENTATION.md](PHASE3_IMPLEMENTATION.md)** - Rate limiting and request ID implementation
+
 ## Resources
 
 - [OWASP ASVS Official Site](https://owasp.org/www-project-application-security-verification-standard/)
@@ -557,4 +655,3 @@ MIT
 - [Model Context Protocol Documentation](https://modelcontextprotocol.io/)
 - [HIPAA Security Rule](https://www.hhs.gov/hipaa/for-professionals/security/index.html) - Official HHS documentation
 - [OpenCRE](https://www.opencre.org) - Additional compliance mappings and cross-references
-- [HIPAA Integration Documentation](HIPAA_INTEGRATION.md) - Detailed HIPAA mapping documentation

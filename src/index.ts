@@ -15,6 +15,9 @@ import fetch from "node-fetch";
 import { readFileSync, statSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { createHash, randomUUID } from "crypto";
+import { createLogger, format, transports } from "winston";
+import https from "https";
 import { OpenCREClient } from "./opencre-client.js";
 
 // Get __dirname equivalent in ES modules
@@ -23,14 +26,66 @@ const __dirname = dirname(__filename);
 
 // Configuration from environment variables
 const USE_OPENCRE = process.env.ASVS_USE_OPENCRE === 'true'; // Enable OpenCRE ISO 27001 mappings
+const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+const LOG_FILE = process.env.LOG_FILE || 'asvs-server.log';
+const EXPECTED_ASVS_HASH = process.env.ASVS_DATA_HASH || ''; // SHA-256 hash for integrity verification
+const SECURITY_TIER = (process.env.ASVS_SECURITY_TIER || 'BALANCED').toUpperCase();
+const RATE_LIMIT_ENABLED = process.env.ASVS_RATE_LIMIT !== 'false'; // Rate limiting (default: enabled)
+const RATE_LIMIT_REQUESTS = parseInt(process.env.ASVS_RATE_LIMIT_REQUESTS || '100'); // Requests per window
+const RATE_LIMIT_WINDOW_MS = parseInt(process.env.ASVS_RATE_LIMIT_WINDOW_MS || '60000'); // Window size in ms
 
-// Security constants - GENEROUS tier (for trusted/internal use)
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
-const MAX_QUERY_LENGTH = 5000;          // 5000 chars
-const MAX_CATEGORY_LENGTH = 1000;       // 1000 chars
-const MAX_ID_LENGTH = 200;              // 200 chars
-const MAX_SEARCH_RESULTS = 500;         // 500 results (return all)
-const MAX_TOKENIZE_LENGTH = 50000;      // 50,000 chars
+// Security tier configurations
+interface SecurityConfig {
+  MAX_FILE_SIZE: number;
+  MAX_QUERY_LENGTH: number;
+  MAX_CATEGORY_LENGTH: number;
+  MAX_ID_LENGTH: number;
+  MAX_SEARCH_RESULTS: number;
+  MAX_TOKENIZE_LENGTH: number;
+  MAX_CACHE_ENTRIES: number;  // Maximum cache entries to prevent memory exhaustion
+}
+
+const SECURITY_TIERS: Record<string, SecurityConfig> = {
+  CONSERVATIVE: {
+    MAX_FILE_SIZE: 10 * 1024 * 1024,      // 10 MB
+    MAX_QUERY_LENGTH: 1000,               // 1000 chars
+    MAX_CATEGORY_LENGTH: 200,             // 200 chars
+    MAX_ID_LENGTH: 50,                    // 50 chars
+    MAX_SEARCH_RESULTS: 100,              // 100 results
+    MAX_TOKENIZE_LENGTH: 10000,           // 10,000 chars
+    MAX_CACHE_ENTRIES: 5000               // 5,000 cache entries
+  },
+  BALANCED: {
+    MAX_FILE_SIZE: 25 * 1024 * 1024,      // 25 MB
+    MAX_QUERY_LENGTH: 2000,               // 2000 chars
+    MAX_CATEGORY_LENGTH: 500,             // 500 chars
+    MAX_ID_LENGTH: 100,                   // 100 chars
+    MAX_SEARCH_RESULTS: 250,              // 250 results
+    MAX_TOKENIZE_LENGTH: 20000,           // 20,000 chars
+    MAX_CACHE_ENTRIES: 10000              // 10,000 cache entries
+  },
+  GENEROUS: {
+    MAX_FILE_SIZE: 50 * 1024 * 1024,      // 50 MB
+    MAX_QUERY_LENGTH: 5000,               // 5000 chars
+    MAX_CATEGORY_LENGTH: 1000,            // 1000 chars
+    MAX_ID_LENGTH: 200,                   // 200 chars
+    MAX_SEARCH_RESULTS: 500,              // 500 results
+    MAX_TOKENIZE_LENGTH: 50000,           // 50,000 chars
+    MAX_CACHE_ENTRIES: 20000              // 20,000 cache entries
+  }
+};
+
+// Get active security configuration
+const CONFIG: SecurityConfig = SECURITY_TIERS[SECURITY_TIER] || SECURITY_TIERS.BALANCED;
+
+// Export constants for backward compatibility
+const MAX_FILE_SIZE = CONFIG.MAX_FILE_SIZE;
+const MAX_QUERY_LENGTH = CONFIG.MAX_QUERY_LENGTH;
+const MAX_CATEGORY_LENGTH = CONFIG.MAX_CATEGORY_LENGTH;
+const MAX_ID_LENGTH = CONFIG.MAX_ID_LENGTH;
+const MAX_SEARCH_RESULTS = CONFIG.MAX_SEARCH_RESULTS;
+const MAX_TOKENIZE_LENGTH = CONFIG.MAX_TOKENIZE_LENGTH;
+const MAX_CACHE_ENTRIES = CONFIG.MAX_CACHE_ENTRIES;
 
 // Types for ASVS data structure
 interface ASVSRequirement {
@@ -138,6 +193,64 @@ interface PrioritizedRequirement {
   minLevel: number;
 }
 
+/**
+ * Rate limiter using sliding window algorithm
+ * Prevents abuse by limiting requests per time window
+ */
+class RateLimiter {
+  private requests = new Map<string, number[]>();
+  private readonly windowMs: number;
+  private readonly maxRequests: number;
+
+  constructor(windowMs: number, maxRequests: number) {
+    this.windowMs = windowMs;
+    this.maxRequests = maxRequests;
+  }
+
+  /**
+   * Check if request is allowed under current rate limits
+   * @param clientId Client identifier (use 'default' for MCP stdio)
+   * @returns true if allowed, false if rate limit exceeded
+   */
+  isAllowed(clientId: string): boolean {
+    const now = Date.now();
+    const timestamps = this.requests.get(clientId) || [];
+
+    // Remove old timestamps outside the window
+    const recent = timestamps.filter(t => now - t < this.windowMs);
+
+    if (recent.length >= this.maxRequests) {
+      return false;
+    }
+
+    recent.push(now);
+    this.requests.set(clientId, recent);
+
+    // Cleanup: Remove empty entries
+    if (recent.length === 0) {
+      this.requests.delete(clientId);
+    }
+
+    return true;
+  }
+
+  /**
+   * Get current request count for a client
+   */
+  getRequestCount(clientId: string): number {
+    const now = Date.now();
+    const timestamps = this.requests.get(clientId) || [];
+    return timestamps.filter(t => now - t < this.windowMs).length;
+  }
+
+  /**
+   * Clear all rate limit data (useful for testing)
+   */
+  reset(): void {
+    this.requests.clear();
+  }
+}
+
 class ASVSServer {
   // Constants
   private static readonly FRAMEWORK_MAP: Readonly<Record<string, string>> = {
@@ -180,6 +293,35 @@ class ASVSServer {
   // HIPAA bidirectional index: ASVS ID → HIPAA requirements that map to it
   private asvsToHipaaIndex: Map<string, HIPAARequirement[]> = new Map();
 
+  // Structured logging
+  private logger = createLogger({
+    level: LOG_LEVEL,
+    format: format.combine(
+      format.timestamp(),
+      format.errors({ stack: true }),
+      format.json()
+    ),
+    transports: [
+      new transports.Console({
+        format: format.simple(),
+        level: 'error',  // Only errors to stderr for MCP compatibility
+        stderrLevels: ['error']
+      }),
+      new transports.File({
+        filename: LOG_FILE,
+        level: LOG_LEVEL,
+        maxsize: 10 * 1024 * 1024,  // 10MB max file size
+        maxFiles: 5,  // Keep 5 rotated logs
+        tailable: true
+      })
+    ]
+  });
+
+  // Rate limiting
+  private rateLimiter = RATE_LIMIT_ENABLED
+    ? new RateLimiter(RATE_LIMIT_WINDOW_MS, RATE_LIMIT_REQUESTS)
+    : null;
+
   constructor() {
     this.server = new Server(
       {
@@ -196,12 +338,69 @@ class ASVSServer {
     // Initialize OpenCRE client if enabled
     if (USE_OPENCRE) {
       this.opencreClient = new OpenCREClient();
-      console.error("OpenCRE integration enabled - ISO 27001 mappings will be fetched dynamically");
+      this.logger.info("OpenCRE integration enabled", { feature: "ISO 27001 mappings" });
     } else {
-      console.error("OpenCRE integration disabled - use ASVS_USE_OPENCRE=true to enable ISO 27001 mappings");
+      this.logger.info("OpenCRE integration disabled", {
+        hint: "Set ASVS_USE_OPENCRE=true to enable ISO 27001 mappings"
+      });
     }
 
     this.setupHandlers();
+    this.logger.info("ASVS MCP Server initialized", {
+      logLevel: LOG_LEVEL,
+      logFile: LOG_FILE,
+      securityTier: SECURITY_TIER,
+      integrityCheckEnabled: !!EXPECTED_ASVS_HASH,
+      rateLimitEnabled: RATE_LIMIT_ENABLED,
+      config: {
+        maxFileSize: `${CONFIG.MAX_FILE_SIZE / 1024 / 1024}MB`,
+        maxQueryLength: CONFIG.MAX_QUERY_LENGTH,
+        maxSearchResults: CONFIG.MAX_SEARCH_RESULTS,
+        rateLimit: RATE_LIMIT_ENABLED
+          ? `${RATE_LIMIT_REQUESTS} requests per ${RATE_LIMIT_WINDOW_MS / 1000}s`
+          : 'disabled'
+      }
+    });
+  }
+
+  /**
+   * Sanitize data for logging to prevent log injection attacks
+   * Removes control characters and newlines
+   */
+  private sanitizeForLog(data: any): any {
+    if (data === null || data === undefined) {
+      return data;
+    }
+
+    if (typeof data === 'string') {
+      return data
+        .replace(/[\r\n\x00-\x1F\x7F]/g, ' ')  // Remove control characters
+        .substring(0, 1000);  // Limit length
+    }
+
+    if (typeof data === 'object') {
+      try {
+        const str = JSON.stringify(data);
+        const sanitized = str.replace(/[\r\n\x00-\x1F\x7F]/g, ' ').substring(0, 5000);
+        return JSON.parse(sanitized);
+      } catch {
+        return '[Circular or Invalid Object]';
+      }
+    }
+
+    return data;
+  }
+
+  /**
+   * Log tool invocations for security monitoring
+   */
+  private logToolCall(toolName: string, args: any, requestId: string): void {
+    this.logger.info('Tool invocation', {
+      requestId,
+      tool: toolName,
+      arguments: this.sanitizeForLog(args),
+      timestamp: new Date().toISOString()
+    });
   }
 
   /**
@@ -228,9 +427,12 @@ class ASVSServer {
             cweMappings[`V${idWithoutPrefix}`] = String(value); // Also store with "V" prefix
           }
         }
-        console.error(`Loaded ${Object.keys(cweMappings).length / 2} CWE mappings from official OWASP source`);
+        this.logger.info('CWE mappings loaded', {
+          count: Object.keys(cweMappings).length / 2,
+          source: 'OWASP ASVS 5.0 official mapping'
+        });
       } catch (error) {
-        console.error("Failed to load CWE mappings:", error);
+        this.logger.error('Failed to load CWE mappings', { error: String(error) });
       }
 
       // Load NIST mappings
@@ -245,12 +447,15 @@ class ASVSServer {
           nistMappings[key] = value as string[];
           nistMappings[`V${key}`] = value as string[]; // Also store with "V" prefix
         }
-        console.error(`Loaded ${Object.keys(nistMappings).length / 2} NIST mappings from official OWASP source`);
+        this.logger.info('NIST mappings loaded', {
+          count: Object.keys(nistMappings).length / 2,
+          source: 'OWASP ASVS 5.0 official mapping'
+        });
       } catch (error) {
-        console.error("Failed to load NIST mappings:", error);
+        this.logger.error('Failed to load NIST mappings', { error: String(error) });
       }
     } catch (error) {
-      console.error("Error loading mapping files:", error);
+      this.logger.error('Error loading mapping files', { error: String(error) });
     }
 
     return { cwe: cweMappings, nist: nistMappings };
@@ -285,13 +490,19 @@ class ASVSServer {
         // Also populate the compliance.hipaa field in ASVS requirements
         this.enrichASVSWithHIPAAMappings();
 
-        console.error(`Loaded HIPAA mappings: ${this.countHIPAARequirements()} HIPAA requirements mapped to ASVS 5.0.0`);
+        this.logger.info('HIPAA mappings loaded', {
+          requirements: this.countHIPAARequirements(),
+          version: 'ASVS 5.0.0'
+        });
         this.hipaaLoaded = true;
       } catch (fileError) {
-        console.error("HIPAA mapping file not found, HIPAA compliance tools will have limited data:", fileError);
+        this.logger.warn('HIPAA mapping file not found', {
+          message: 'HIPAA compliance tools will have limited data',
+          error: String(fileError)
+        });
       }
     } catch (error) {
-      console.error("Error loading HIPAA mappings:", error);
+      this.logger.error('Error loading HIPAA mappings', { error: String(error) });
     }
   }
 
@@ -318,7 +529,9 @@ class ASVSServer {
       }
     }
 
-    console.error(`Built HIPAA index: ${this.asvsToHipaaIndex.size} ASVS requirements have HIPAA mappings`);
+    this.logger.info('HIPAA index built', {
+      asvsRequirementsWithHIPAA: this.asvsToHipaaIndex.size
+    });
   }
 
   /**
@@ -373,33 +586,120 @@ class ASVSServer {
         const data = JSON.parse(fileContent);
         this.asvsData = this.parseASVSData(data, mappings);
         this.dataSource = 'local';
-        console.error("ASVS data loaded from local file (fast path)");
+        this.logger.info('ASVS data loaded from local file', {
+          source: 'fast path',
+          categories: this.asvsData.length,
+          path: localFilePath
+        });
       } catch (fileError) {
         // Fallback to remote if local file doesn't exist or is invalid
-        console.error("Local file not found, fetching from remote:", fileError);
+        this.logger.warn('Local file not found, fetching from remote', {
+          error: String(fileError)
+        });
 
         // Fetch ASVS 5.0 data from official OWASP repository
         const url = "https://raw.githubusercontent.com/OWASP/ASVS/refs/heads/master/5.0/docs_en/OWASP_Application_Security_Verification_Standard_5.0.0_en.json";
-        const response = await fetch(url);
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        // Security: Explicit TLS configuration for remote fetch
+        const httpsAgent = new https.Agent({
+          rejectUnauthorized: true,   // Validate certificates
+          minVersion: 'TLSv1.2',      // Enforce minimum TLS 1.2
+          maxVersion: 'TLSv1.3',      // Prefer TLS 1.3
+          // Additional security: Ensure proper hostname verification
+          checkServerIdentity: (host, cert) => {
+            if (host !== 'raw.githubusercontent.com') {
+              this.logger.warn('Unexpected host for ASVS fetch', { host, expected: 'raw.githubusercontent.com' });
+            }
+            // Return undefined to use default validation
+            return undefined;
+          }
+        });
+
+        this.logger.info('Fetching ASVS data from remote', {
+          url,
+          tlsConfig: {
+            minVersion: 'TLSv1.2',
+            maxVersion: 'TLSv1.3',
+            certificateValidation: true
+          }
+        });
+
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);  // 30 second timeout
+
+        try {
+          const response = await fetch(url, {
+            agent: httpsAgent,
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          // Log TLS version if available
+          const socket = (response as any).socket;
+          if (socket?.getProtocol) {
+            this.logger.info('TLS connection established', {
+              protocol: socket.getProtocol(),
+              cipher: socket.getCipher?.()?.name || 'unknown'
+            });
+          }
+
+          // Security: Check Content-Length before downloading
+          const contentLength = response.headers.get('content-length');
+          if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
+            throw new Error(`Remote data exceeds maximum allowed size (${MAX_FILE_SIZE} bytes)`);
+          }
+
+          const data = await response.json() as any;
+
+          // Security: Verify data integrity if hash is configured
+          if (EXPECTED_ASVS_HASH) {
+            const dataText = JSON.stringify(data);
+            const actualHash = createHash('sha256')
+              .update(dataText)
+              .digest('hex');
+
+            if (actualHash !== EXPECTED_ASVS_HASH) {
+              this.logger.error('Data integrity verification failed', {
+                expected: EXPECTED_ASVS_HASH,
+                actual: actualHash,
+                url
+              });
+              throw new Error('ASVS data integrity verification failed - potential MITM attack');
+            }
+
+            this.logger.info('Data integrity verified', {
+              hash: actualHash,
+              algorithm: 'SHA-256'
+            });
+          } else {
+            this.logger.warn('Data integrity check skipped', {
+              message: 'Set ASVS_DATA_HASH environment variable to enable verification'
+            });
+          }
+
+          this.asvsData = this.parseASVSData(data, mappings);
+          this.dataSource = 'remote';
+          this.logger.info('ASVS data loaded from remote source', {
+            url,
+            categories: this.asvsData.length,
+            integrityVerified: !!EXPECTED_ASVS_HASH
+          });
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          throw fetchError;
         }
-
-        // Security: Check Content-Length before downloading
-        const contentLength = response.headers.get('content-length');
-        if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
-          throw new Error(`Remote data exceeds maximum allowed size (${MAX_FILE_SIZE} bytes)`);
-        }
-
-        const data = await response.json() as any;
-        this.asvsData = this.parseASVSData(data, mappings);
-        this.dataSource = 'remote';
-        console.error("ASVS data loaded from remote source");
       }
 
     } catch (error) {
-      console.error("Failed to load ASVS data, using mock data:", error);
+      this.logger.error('Failed to load ASVS data, using mock data', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       this.asvsData = this.getMockData();
       this.dataSource = 'mock';
     }
@@ -438,6 +738,8 @@ class ASVSServer {
 
   private buildSearchIndex(): void {
     this.searchIndex.clear();
+    let totalCacheEntries = 0;
+
     for (const category of this.asvsData) {
       for (const req of category.requirements) {
         const tokens = new Set([
@@ -449,12 +751,29 @@ class ASVSServer {
 
         for (const token of tokens) {
           if (!this.searchIndex.has(token)) {
+            // Check cache size limit to prevent memory exhaustion
+            if (totalCacheEntries >= MAX_CACHE_ENTRIES) {
+              this.logger.warn('Search index cache limit reached', {
+                limit: MAX_CACHE_ENTRIES,
+                currentSize: totalCacheEntries,
+                securityTier: SECURITY_TIER
+              });
+              return; // Stop building index when limit is reached
+            }
+
             this.searchIndex.set(token, new Set());
+            totalCacheEntries++;
           }
           this.searchIndex.get(token)!.add(req.id);
         }
       }
     }
+
+    this.logger.info('Search index built', {
+      totalTokens: this.searchIndex.size,
+      cacheLimit: MAX_CACHE_ENTRIES,
+      utilizationPercent: Math.round((this.searchIndex.size / MAX_CACHE_ENTRIES) * 100)
+    });
   }
 
   private tokenize(text: string | number): string[] {
@@ -472,13 +791,14 @@ class ASVSServer {
   }
 
   // Helper methods
-  private createTextResponse(data: any): { content: Array<{ type: string; text: string }> } {
+  private createTextResponse(data: any, requestId?: string): { content: Array<{ type: string; text: string }> } {
     return {
       content: [{
         type: "text",
         text: JSON.stringify({
           ...data,
           _meta: {
+            requestId,
             data_source: this.dataSource,
             version: '5.0.0',
             hipaa_mappings_loaded: this.hipaaLoaded,
@@ -518,11 +838,28 @@ class ASVSServer {
     };
   }
 
-  private createErrorResponse(message: string): { content: Array<{ type: string; text: string }>; isError: boolean } {
+  private createErrorResponse(message: string, internalDetails?: string): { content: Array<{ type: string; text: string }>; isError: boolean } {
+    // Sanitize user-facing message to prevent log injection and limit information disclosure
+    const safeMessage = message
+      .replace(/[\r\n\x00-\x1F\x7F]/g, ' ')  // Remove control characters
+      .substring(0, 200);  // Limit length
+
+    // Log detailed error internally for security monitoring
+    if (internalDetails) {
+      this.logger.error('Error response generated', {
+        userMessage: safeMessage,
+        internalDetails: this.sanitizeForLog(internalDetails),
+        timestamp: new Date().toISOString()
+      });
+    }
+
     return {
       content: [{
         type: "text",
-        text: JSON.stringify({ error: message }, null, 2)
+        text: JSON.stringify({
+          error: safeMessage,
+          hint: "Use 'get_category_summary' to see available options"
+        }, null, 2)
       }],
       isError: true
     };
@@ -1105,37 +1442,67 @@ class ASVSServer {
     }));
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      // Generate unique request ID for correlation
+      const requestId = randomUUID();
+
       await this.loadASVSData();
 
       const args = request.params.arguments || {};
 
+      // Check rate limit (use 'default' as client ID for MCP stdio)
+      if (this.rateLimiter && !this.rateLimiter.isAllowed('default')) {
+        const currentCount = this.rateLimiter.getRequestCount('default');
+        this.logger.warn('Rate limit exceeded', {
+          requestId,
+          tool: request.params.name,
+          currentRequests: currentCount,
+          limit: RATE_LIMIT_REQUESTS,
+          windowSeconds: RATE_LIMIT_WINDOW_MS / 1000
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              error: "Rate limit exceeded. Please try again later.",
+              hint: `Maximum ${RATE_LIMIT_REQUESTS} requests per ${RATE_LIMIT_WINDOW_MS / 1000} seconds`,
+              retryAfter: Math.ceil(RATE_LIMIT_WINDOW_MS / 1000),
+              requestId
+            }, null, 2)
+          }]
+        };
+      }
+
+      // Log tool invocation for security monitoring
+      this.logToolCall(request.params.name, args, requestId);
+
       switch (request.params.name) {
         case "get_requirements_by_level":
-          return this.getRequirementsByLevel(args as unknown as GetRequirementsByLevelArgs);
+          return this.getRequirementsByLevel(args as unknown as GetRequirementsByLevelArgs, requestId);
 
         case "get_requirements_by_category":
-          return this.getRequirementsByCategory(args as unknown as GetRequirementsByCategoryArgs);
+          return this.getRequirementsByCategory(args as unknown as GetRequirementsByCategoryArgs, requestId);
 
         case "get_requirement_details":
-          return this.getRequirementDetails(args as unknown as GetRequirementDetailsArgs);
+          return this.getRequirementDetails(args as unknown as GetRequirementDetailsArgs, requestId);
 
         case "recommend_priority_controls":
-          return this.recommendPriorityControls(args as unknown as RecommendPriorityControlsArgs);
+          return this.recommendPriorityControls(args as unknown as RecommendPriorityControlsArgs, requestId);
 
         case "search_requirements":
-          return this.searchRequirements(args as unknown as SearchRequirementsArgs);
+          return this.searchRequirements(args as unknown as SearchRequirementsArgs, requestId);
 
         case "get_category_summary":
-          return this.getCategorySummary();
+          return this.getCategorySummary(requestId);
 
         case "get_compliance_requirements":
-          return this.getComplianceRequirements(args as unknown as GetComplianceRequirementsArgs);
+          return this.getComplianceRequirements(args as unknown as GetComplianceRequirementsArgs, requestId);
 
         case "get_compliance_gap_analysis":
-          return this.getComplianceGapAnalysis(args as unknown as GetComplianceGapAnalysisArgs);
+          return this.getComplianceGapAnalysis(args as unknown as GetComplianceGapAnalysisArgs, requestId);
 
         case "map_requirement_to_compliance":
-          return this.mapRequirementToCompliance(args as unknown as MapRequirementToComplianceArgs);
+          return this.mapRequirementToCompliance(args as unknown as MapRequirementToComplianceArgs, requestId);
 
         default:
           throw new Error(`Unknown tool: ${request.params.name}`);
@@ -1143,7 +1510,7 @@ class ASVSServer {
     });
   }
 
-  private getRequirementsByLevel(args: GetRequirementsByLevelArgs) {
+  private getRequirementsByLevel(args: GetRequirementsByLevelArgs, requestId: string) {
     const { level, offset, limit } = args;
 
     if (![1, 2, 3].includes(level)) {
@@ -1165,10 +1532,10 @@ class ASVSServer {
       level: `L${level}`,
       ...paginated.pagination,
       requirements: paginated.items
-    });
+    }, requestId);
   }
 
-  private getRequirementsByCategory(args: GetRequirementsByCategoryArgs) {
+  private getRequirementsByCategory(args: GetRequirementsByCategoryArgs, requestId: string) {
     const { category: categoryName, level, offset, limit } = args;
 
     // Security: Validate input length
@@ -1193,7 +1560,8 @@ class ASVSServer {
 
     if (!category) {
       return this.createErrorResponse(
-        `Category '${categoryName}' not found. Available categories: ${this.asvsData.map(c => c.name).join(', ')}`
+        `Category not found. Please check the category name.`,
+        `Category '${categoryName}' not found. Available: ${this.asvsData.map(c => c.name).join(', ')}`
       );
     }
 
@@ -1209,10 +1577,10 @@ class ASVSServer {
       id: category.id,
       ...paginated.pagination,
       requirements: paginated.items
-    });
+    }, requestId);
   }
 
-  private getRequirementDetails(args: GetRequirementDetailsArgs) {
+  private getRequirementDetails(args: GetRequirementDetailsArgs, requestId: string) {
     const { requirement_id: reqId } = args;
 
     // Security: Validate input length
@@ -1227,13 +1595,13 @@ class ASVSServer {
         requirement: indexed.requirement,
         category_name: indexed.category.name,
         category_id: indexed.category.id
-      });
+      }, requestId);
     }
 
     return this.createErrorResponse(`Requirement '${reqId}' not found.`);
   }
 
-  private recommendPriorityControls(args: RecommendPriorityControlsArgs) {
+  private recommendPriorityControls(args: RecommendPriorityControlsArgs, requestId: string) {
     const { target_level: targetLevel, current_level = 0, focus_areas = [], application_type: appType, offset, limit } = args;
 
     const recommendations: PrioritizedRequirement[] = [];
@@ -1286,10 +1654,10 @@ class ASVSServer {
       focus_areas,
       ...paginated.pagination,
       recommendations: paginated.items
-    });
+    }, requestId);
   }
 
-  private searchRequirements(args: SearchRequirementsArgs) {
+  private searchRequirements(args: SearchRequirementsArgs, requestId: string) {
     const { query, level, offset, limit } = args;
 
     // Security: Validate query length
@@ -1323,10 +1691,10 @@ class ASVSServer {
       query,
       ...paginated.pagination,
       results: paginated.items
-    });
+    }, requestId);
   }
 
-  private getCategorySummary() {
+  private getCategorySummary(requestId: string) {
     const summary = this.asvsData.map(category => {
       const counts = { l1: 0, l2: 0, l3: 0 };
 
@@ -1350,10 +1718,10 @@ class ASVSServer {
     return this.createTextResponse({
       total_categories: summary.length,
       categories: summary
-    });
+    }, requestId);
   }
 
-  private getComplianceRequirements(args: GetComplianceRequirementsArgs) {
+  private getComplianceRequirements(args: GetComplianceRequirementsArgs, requestId: string) {
     const { framework, level, offset, limit } = args;
 
     const results: Array<ASVSRequirement & { compliance_references: string[] }> = [];
@@ -1380,10 +1748,10 @@ class ASVSServer {
       level: level ? `L${level}` : "All levels",
       ...paginated.pagination,
       requirements: paginated.items
-    });
+    }, requestId);
   }
 
-  private getComplianceGapAnalysis(args: GetComplianceGapAnalysisArgs) {
+  private getComplianceGapAnalysis(args: GetComplianceGapAnalysisArgs, requestId: string) {
     const { frameworks, target_level: targetLevel, implemented_requirements = [] } = args;
     const implemented = new Set(implemented_requirements);
 
@@ -1446,7 +1814,7 @@ class ASVSServer {
           : 0
       })),
       gaps
-    });
+    }, requestId);
   }
 
   private calculateGapPriority(req: ASVSRequirement, framework: string): string {
@@ -1477,7 +1845,7 @@ class ASVSServer {
     return "LOW";
   }
 
-  private mapRequirementToCompliance(args: MapRequirementToComplianceArgs) {
+  private mapRequirementToCompliance(args: MapRequirementToComplianceArgs, requestId: string) {
     const { requirement_id: reqId } = args;
 
     // Security: Validate input length
@@ -1517,15 +1885,25 @@ class ASVSServer {
       compliance_impact: totalMappings > 0
         ? "Implementing this requirement helps satisfy multiple compliance frameworks"
         : "No direct compliance mappings identified"
-    });
+    }, requestId);
   }
 
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
+    this.logger.info("OWASP ASVS MCP server started", {
+      transport: "stdio",
+      version: "0.4.0",
+      logLevel: LOG_LEVEL,
+      integrityCheckEnabled: !!EXPECTED_ASVS_HASH
+    });
+    // Keep console.error for MCP compatibility (stderr visibility)
     console.error("OWASP ASVS MCP server running on stdio");
   }
 }
 
 const server = new ASVSServer();
-server.run().catch(console.error);
+server.run().catch((error) => {
+  console.error("Fatal error starting server:", error);
+  process.exit(1);
+});

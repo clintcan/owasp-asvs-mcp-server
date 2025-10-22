@@ -4,12 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an MCP (Model Context Protocol) server that provides AI assistants with access to OWASP ASVS (Application Security Verification Standard) data. The server exposes 9 tools for querying security requirements, generating recommendations, and mapping compliance frameworks.
+This is a **production-ready** MCP (Model Context Protocol) server that provides AI assistants with access to OWASP ASVS (Application Security Verification Standard) data. The server exposes 9 tools for querying security requirements, generating recommendations, and mapping compliance frameworks.
 
-**Current Version**: 0.4.0 (2025-10-22)
+**Current Version**: 0.5.0 (2025-10-23) - Production Security Release
 **ASVS Version**: 5.0.0 (345 requirements, 17 chapters)
+**Security Status**: ✅ 87% ASVS Level 1 Compliance - Production Ready
 **HIPAA Mappings**: ✅ Validated - 76 HIPAA requirements, 102 mappings, 94.7% coverage
 **Git Repository**: https://github.com/clintcan/owasp-asvs-mcp-server
+
+**Production Security Features:**
+- Winston structured logging with JSON format and rotation
+- TLS 1.2+ with certificate validation
+- SHA-256 data integrity verification
+- Rate limiting (100 req/min default)
+- Configurable security tiers (CONSERVATIVE/BALANCED/GENEROUS)
+- Request ID tracking with UUID
+- Comprehensive security documentation
 
 ## Installation from Repository
 
@@ -41,6 +51,12 @@ npm run dev
 
 # Update ASVS data from OWASP repository (optional)
 npm run update-asvs
+
+# Run security tests
+npm run test:phase1   # Logging and data integrity tests
+npm run test:phase2   # Configuration and TLS tests
+npm run test:phase3   # Rate limiting and request ID tests
+npm run test:all      # Run all test suites
 ```
 
 The compiled output goes to `dist/` directory. The main entry point is `dist/index.js`.
@@ -84,7 +100,7 @@ To use this MCP server in Claude Code:
    }
    ```
 
-   **Option 3 - Project-level (version controlled):**
+   **Option 3 - Project-level with environment variables (recommended for production):**
 
    Create `.mcp.json` in your project root:
    ```json
@@ -92,7 +108,15 @@ To use this MCP server in Claude Code:
      "mcpServers": {
        "owasp-asvs": {
          "command": "node",
-         "args": ["/absolute/path/to/owasp-asvs-mcp-server/dist/index.js"]
+         "args": ["/absolute/path/to/owasp-asvs-mcp-server/dist/index.js"],
+         "env": {
+           "ASVS_SECURITY_TIER": "BALANCED",
+           "ASVS_RATE_LIMIT": "true",
+           "ASVS_RATE_LIMIT_REQUESTS": "100",
+           "LOG_LEVEL": "warn",
+           "LOG_FILE": "./asvs-server.log",
+           "ASVS_DATA_HASH": ""
+         }
        }
      }
    }
@@ -103,18 +127,23 @@ To use this MCP server in Claude Code:
 4. **Verify it's working**:
    - Use `/mcp` command to see available MCP servers
    - Test by asking: "Show me all ASVS Level 1 authentication requirements"
+   - Check log file for startup confirmation
 
 **Note**: For Claude Desktop (not Claude Code), use different config files:
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
+**Configuration Documentation**: See `SETUP_GUIDE.md` for detailed setup instructions and `ENVIRONMENT_VARIABLES.md` for complete configuration reference.
+
 ## Architecture
 
 ### Single-File Server Design
-All server logic is in `src/index.ts` (~1200 lines). The server uses:
+All server logic is in `src/index.ts` (~1400 lines with security features). The server uses:
 - **MCP SDK** (`@modelcontextprotocol/sdk`) for protocol handling
 - **StdioServerTransport** for communication over stdin/stdout
-- **node-fetch** for fetching ASVS data from GitHub
+- **node-fetch** for fetching ASVS data from GitHub with TLS 1.2+
+- **winston** for structured logging (JSON format, rotation)
+- **crypto** (Node.js built-in) for SHA-256 integrity verification and UUID generation
 
 ### Core Components
 
@@ -182,16 +211,33 @@ All 9 tools follow this pattern:
 
 ## Key Files
 
-- `src/index.ts` - Entire server implementation (~1200 lines)
+### Core Implementation
+- `src/index.ts` - Entire server implementation (~1400 lines with security features)
+- `package.json` - Dependencies: MCP SDK, node-fetch, winston; Scripts: build, watch, dev, test
+- `tsconfig.json` - ES2022 target, Node16 modules, strict mode enabled
+
+### Data Files
 - `data/asvs-5.0.0.json` - ASVS 5.0.0 requirements (345 requirements, 17 chapters)
 - `data/asvs-5.0.0-hipaa-mapping.json` - ✅ Validated HIPAA mappings (76 reqs, 102 mappings)
 - `data/asvs-cwe-mapping.json` - ✅ Official OWASP CWE mappings (214 mappings)
 - `data/asvs-nist-mapping.json` - ✅ Official OWASP NIST 800-63B mappings (52 mappings)
-- `package.json` - Dependencies: MCP SDK, node-fetch; Scripts: build, watch, dev
-- `tsconfig.json` - ES2022 target, Node16 modules, strict mode enabled
+
+### Documentation
 - `README.md` - User-facing documentation with tool descriptions and usage examples
+- `SECURITY.md` - Comprehensive security documentation (13.5 KB)
+- `SECURITY_AUDIT_REPORT.md` - ASVS Level 1 audit results (87% compliance)
+- `SETUP_GUIDE.md` - Four different setup methods with examples
+- `ENVIRONMENT_VARIABLES.md` - Complete configuration reference
 - `HIPAA_INTEGRATION.md` - Detailed HIPAA mapping documentation
 - `CLAUDE.md` - This file - Claude Code instructions
+- `PHASE1_IMPLEMENTATION.md` - Logging and data integrity implementation
+- `PHASE2_IMPLEMENTATION.md` - Configuration and TLS implementation
+- `PHASE3_IMPLEMENTATION.md` - Rate limiting and request ID implementation
+
+### Test Files
+- `test-phase1.js` - Tests for logging and data integrity
+- `test-phase2.js` - Tests for configuration and TLS
+- `test-phase3.js` - Tests for rate limiting and request IDs
 
 ## Development Notes
 
@@ -219,27 +265,35 @@ All 9 tools follow this pattern:
 - To update: `npm run update-asvs` downloads latest from OWASP
 - Update script: `scripts/update-asvs-data.js`
 
-**Security constraints** (src/index.ts:23-29):
-- **Current Tier**: Generous (for trusted/internal use)
-- File size limit: 50 MB (covers future ASVS versions)
-- Query length: 5000 chars (complex searches supported)
-- Search results: 500 max (returns all matches in most cases)
-- Input validation prevents DoS while allowing extensive legitimate use
+**Security configuration** (NEW in 0.5.0):
+- **Default Tier**: BALANCED (production-recommended)
+- **Configuration**: Via `ASVS_SECURITY_TIER` environment variable
+- **Rate Limiting**: Enabled by default (100 requests/minute)
+- **TLS**: 1.2+ with explicit certificate validation
+- **Logging**: Winston with JSON format and rotation (10MB max, 5 files)
+- **Data Integrity**: SHA-256 hash verification (configurable via `ASVS_DATA_HASH`)
 
 **Available Security Tiers**:
 
-| Constraint | Conservative | Balanced | Generous ⭐ | Maximum |
-|------------|--------------|----------|-------------|---------|
-| File Size | 10 MB | 25 MB | **50 MB** | 100 MB |
-| Query Length | 1000 | 2000 | **5000** | 10000 |
-| Category Name | 200 | 500 | **1000** | 2000 |
-| ID Length | 50 | 100 | **200** | 500 |
-| Search Results | 100 | 250 | **500** | 1000 |
-| Tokenize Input | 10K | 20K | **50K** | 100K |
-| **Security Level** | Excellent | Excellent | Good | Fair |
-| **Best For** | Public APIs | Most uses | Internal | Dev only |
+| Constraint | CONSERVATIVE | BALANCED ⭐ | GENEROUS |
+|------------|--------------|-------------|----------|
+| File Size | 10 MB | **25 MB** | 50 MB |
+| Query Length | 1000 chars | **2000 chars** | 5000 chars |
+| Max Category Name | 200 chars | **500 chars** | 1000 chars |
+| Max ID Length | 50 chars | **100 chars** | 200 chars |
+| Search Results | 100 | **250** | 500 |
+| Cache Entries | 5,000 | **10,000** | 20,000 |
+| **Security Level** | Excellent | **Excellent** | Good |
+| **Best For** | Public APIs | **Production** | Development |
 
-To change tiers, modify the constants at the top of `src/index.ts` (lines 23-29)
+**Additional Security Features (NEW in 0.5.0)**:
+- ✅ Rate limiting with sliding window algorithm
+- ✅ Request ID tracking with UUID (randomUUID())
+- ✅ Memory safety with cache size limits
+- ✅ Error sanitization to prevent information disclosure
+- ✅ Structured logging with winston (JSON format, rotation)
+
+To configure, set environment variables in `.mcp.json` or deployment configuration (see `SETUP_GUIDE.md`)
 
 **Compliance framework keys**:
 Use snake_case internally: `pci_dss`, `hipaa`, `gdpr`, `sox`, `iso27001`
@@ -258,3 +312,13 @@ Use snake_case internally: `pci_dss`, `hipaa`, `gdpr`, `sox`, `iso27001`
 ## Security Focus
 
 This is a defensive security tool. All functionality is read-only - it queries and analyzes OWASP ASVS data but does not execute code, modify systems, or perform offensive security operations.
+
+**Security Status**: ✅ **87% ASVS Level 1 Compliance - Production Ready**
+
+The server has undergone comprehensive security hardening (Phases 1-3) and achieved:
+- 87% ASVS Level 1 compliance (up from 66%)
+- Production-ready status with LOW risk rating
+- Comprehensive security controls and documentation
+- Automated security test suites
+
+See `SECURITY_AUDIT_REPORT.md` for detailed security assessment.

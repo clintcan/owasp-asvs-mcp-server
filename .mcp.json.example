@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "owasp-asvs": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "env": {
+        "ASVS_SECURITY_TIER": "BALANCED",
+        "ASVS_RATE_LIMIT": "true",
+        "ASVS_RATE_LIMIT_REQUESTS": "100",
+        "ASVS_RATE_LIMIT_WINDOW_MS": "60000",
+        "LOG_LEVEL": "warn",
+        "LOG_FILE": "./asvs-server.log",
+        "ASVS_DATA_HASH": "",
+        "ASVS_USE_OPENCRE": "false"
+      }
+    }
+  }
+}
