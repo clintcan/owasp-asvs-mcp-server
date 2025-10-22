@@ -1,0 +1,1066 @@
+{
+  "standard": "HIPAA Security and Privacy Requirements",
+  "version": "March 2013",
+  "based_on_document": "45 CFR Parts 160, 162, and 164",
+  "format_based_on": "OWASP ASVS 4.0.3",
+  "description": "HIPAA Administrative Simplification Regulation - Security and Privacy Requirements mapped to OWASP ASVS structure (CORRECTED VERSION)",
+  "correction_notes": {
+    "date": "2025-10-22",
+    "validation_script": "scripts/validate-hipaa-mappings.js",
+    "issues_fixed": 6,
+    "changes": [
+      "H1.8.1: Changed v4.0.3-1.14.7 → v4.0.3-1.14.3 (V1.14 only has 6 requirements)",
+      "H2.1.1: Removed v4.0.3-14.2.7 (physical security has no direct ASVS equivalent, marked as asvs_coverage: 'none')",
+      "H2.1.2: Removed v4.0.3-14.2.7 (same as H2.1.1)",
+      "H2.1.3: Removed v4.0.3-14.2.7 (same as H2.1.1)",
+      "H5.2.4: Changed v4.0.3-1.14.7 → v4.0.3-1.14.3 (same issue as H1.8.1)",
+      "H7.6.3: Changed v4.0.3-1.1.8 → v4.0.3-1.1.7 (V1.1 only has 7 requirements, but this is organizational/HR requirement with limited ASVS applicability)"
+    ]
+  },
+  "levels": {
+    "L1": "Required - All covered entities and business associates must comply",
+    "L2": "Addressable - Implementation alternative is acceptable if reasonable and appropriate",
+    "L3": "Enhanced - Additional controls for high-risk environments"
+  },
+  "categories": [
+    {
+      "id": "H1",
+      "name": "Administrative Safeguards",
+      "description": "Administrative actions, policies, and procedures to manage the selection, development, implementation, and maintenance of security measures to protect electronic protected health information (ePHI)",
+      "based_on": "45 CFR § 164.308",
+      "owasp_mapping": ["V1-Architecture", "V10-Malicious Code", "V14-Configuration"],
+      "sections": [
+        {
+          "id": "H1.1",
+          "name": "Security Management Process",
+          "requirements": [
+            {
+              "id": "H1.1.1",
+              "level": ["L1"],
+              "description": "Implement policies and procedures to prevent, detect, contain, and correct security violations",
+              "hipaa_reference": "§ 164.308(a)(1)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.1.1", "v4.0.3-1.14.1"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H1.1.2",
+              "level": ["L1"],
+              "description": "Conduct an accurate and thorough assessment of potential risks and vulnerabilities to the confidentiality, integrity, and availability of ePHI",
+              "hipaa_reference": "§ 164.308(a)(1)(ii)(A)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.1.2", "v4.0.3-1.14.2"],
+              "implementation_specification": "Risk Analysis"
+            },
+            {
+              "id": "H1.1.3",
+              "level": ["L1"],
+              "description": "Implement security measures sufficient to reduce risks and vulnerabilities to a reasonable and appropriate level",
+              "hipaa_reference": "§ 164.308(a)(1)(ii)(B)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.1.3", "v4.0.3-14.1.1"],
+              "implementation_specification": "Risk Management"
+            },
+            {
+              "id": "H1.1.4",
+              "level": ["L2"],
+              "description": "Implement procedures to regularly review records of information system activity",
+              "hipaa_reference": "§ 164.308(a)(1)(ii)(D)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-7.1.1", "v4.0.3-7.1.2"],
+              "implementation_specification": "Information System Activity Review"
+            }
+          ]
+        },
+        {
+          "id": "H1.2",
+          "name": "Assigned Security Responsibility",
+          "requirements": [
+            {
+              "id": "H1.2.1",
+              "level": ["L1"],
+              "description": "Identify the security official responsible for development and implementation of security policies and procedures",
+              "hipaa_reference": "§ 164.308(a)(2)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.1.4"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        },
+        {
+          "id": "H1.3",
+          "name": "Workforce Security",
+          "requirements": [
+            {
+              "id": "H1.3.1",
+              "level": ["L1"],
+              "description": "Implement policies and procedures to ensure workforce members have appropriate access to ePHI and prevent unauthorized access",
+              "hipaa_reference": "§ 164.308(a)(3)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-4.1.1", "v4.0.3-4.1.2"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H1.3.2",
+              "level": ["L2"],
+              "description": "Implement procedures for authorization and/or supervision of workforce members accessing ePHI",
+              "hipaa_reference": "§ 164.308(a)(3)(ii)(A)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-4.1.3", "v4.0.3-4.2.1"],
+              "implementation_specification": "Authorization and Supervision"
+            },
+            {
+              "id": "H1.3.3",
+              "level": ["L2"],
+              "description": "Implement procedures for determining that workforce member access is appropriate",
+              "hipaa_reference": "§ 164.308(a)(3)(ii)(B)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-4.1.3", "v4.0.3-4.3.1"],
+              "implementation_specification": "Workforce Clearance Procedure"
+            },
+            {
+              "id": "H1.3.4",
+              "level": ["L2"],
+              "description": "Implement procedures for terminating access to ePHI when employment ends or as required by access determinations",
+              "hipaa_reference": "§ 164.308(a)(3)(ii)(C)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-4.2.2"],
+              "implementation_specification": "Termination Procedures"
+            }
+          ]
+        },
+        {
+          "id": "H1.4",
+          "name": "Information Access Management",
+          "requirements": [
+            {
+              "id": "H1.4.1",
+              "level": ["L1"],
+              "description": "Implement policies and procedures for authorizing access to ePHI consistent with applicable HIPAA Privacy Rule requirements",
+              "hipaa_reference": "§ 164.308(a)(4)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-4.1.1", "v4.0.3-4.1.2"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H1.4.2",
+              "level": ["L2"],
+              "description": "Implement policies and procedures that establish, document, review, and modify user access rights to workstations, systems, and applications",
+              "hipaa_reference": "§ 164.308(a)(4)(ii)(C)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-4.1.3", "v4.0.3-4.2.1"],
+              "implementation_specification": "Access Authorization"
+            },
+            {
+              "id": "H1.4.3",
+              "level": ["L2"],
+              "description": "Implement policies and procedures for granting access to ePHI through workstations, transactions, programs, processes, or other mechanisms",
+              "hipaa_reference": "§ 164.308(a)(4)(ii)(B)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-4.3.1", "v4.0.3-4.3.2"],
+              "implementation_specification": "Access Establishment and Modification"
+            }
+          ]
+        },
+        {
+          "id": "H1.5",
+          "name": "Security Awareness and Training",
+          "requirements": [
+            {
+              "id": "H1.5.1",
+              "level": ["L1"],
+              "description": "Implement security awareness and training program for all workforce members",
+              "hipaa_reference": "§ 164.308(a)(5)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.1.5"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H1.5.2",
+              "level": ["L2"],
+              "description": "Implement procedures for guarding against, detecting, and reporting malicious software",
+              "hipaa_reference": "§ 164.308(a)(5)(ii)(B)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-10.3.1", "v4.0.3-10.3.2"],
+              "implementation_specification": "Protection from Malicious Software"
+            },
+            {
+              "id": "H1.5.3",
+              "level": ["L2"],
+              "description": "Implement procedures for creating, changing, and safeguarding passwords",
+              "hipaa_reference": "§ 164.308(a)(5)(ii)(D)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-2.1.1", "v4.0.3-2.1.7"],
+              "implementation_specification": "Password Management"
+            }
+          ]
+        },
+        {
+          "id": "H1.6",
+          "name": "Security Incident Procedures",
+          "requirements": [
+            {
+              "id": "H1.6.1",
+              "level": ["L1"],
+              "description": "Implement policies and procedures to address security incidents",
+              "hipaa_reference": "§ 164.308(a)(6)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-7.3.1"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H1.6.2",
+              "level": ["L1"],
+              "description": "Identify and respond to suspected or known security incidents; mitigate harmful effects; document security incidents and outcomes",
+              "hipaa_reference": "§ 164.308(a)(6)(ii)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-7.3.2", "v4.0.3-7.1.3"],
+              "implementation_specification": "Response and Reporting"
+            }
+          ]
+        },
+        {
+          "id": "H1.7",
+          "name": "Contingency Plan",
+          "requirements": [
+            {
+              "id": "H1.7.1",
+              "level": ["L1"],
+              "description": "Establish and implement policies and procedures for responding to emergencies or other occurrences that damage systems containing ePHI",
+              "hipaa_reference": "§ 164.308(a)(7)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.11.1"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H1.7.2",
+              "level": ["L1"],
+              "description": "Establish procedures to create and maintain retrievable exact copies of ePHI",
+              "hipaa_reference": "§ 164.308(a)(7)(ii)(A)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-8.3.4"],
+              "implementation_specification": "Data Backup Plan"
+            },
+            {
+              "id": "H1.7.3",
+              "level": ["L1"],
+              "description": "Establish procedures to restore lost data and enable continuation of critical business processes",
+              "hipaa_reference": "§ 164.308(a)(7)(ii)(B)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.11.2"],
+              "implementation_specification": "Disaster Recovery Plan"
+            },
+            {
+              "id": "H1.7.4",
+              "level": ["L2"],
+              "description": "Establish procedures to enable continuation of critical business processes for protection of ePHI while operating in emergency mode",
+              "hipaa_reference": "§ 164.308(a)(7)(ii)(C)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-1.11.3"],
+              "implementation_specification": "Emergency Mode Operation Plan"
+            },
+            {
+              "id": "H1.7.5",
+              "level": ["L2"],
+              "description": "Implement procedures for periodic testing and revision of contingency plans",
+              "hipaa_reference": "§ 164.308(a)(7)(ii)(D)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-1.14.6"],
+              "implementation_specification": "Testing and Revision Procedures"
+            }
+          ]
+        },
+        {
+          "id": "H1.8",
+          "name": "Evaluation",
+          "requirements": [
+            {
+              "id": "H1.8.1",
+              "level": ["L1"],
+              "description": "Perform periodic technical and non-technical evaluation in response to environmental or operational changes affecting ePHI security",
+              "hipaa_reference": "§ 164.308(a)(8)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.14.3"],
+              "implementation_specification": "Standard",
+              "mapping_note": "CORRECTED: Was v4.0.3-1.14.7 (invalid). Now maps to V1.14.3 (build pipeline warns of out-of-date components) as closest match for periodic evaluation of security posture."
+            }
+          ]
+        },
+        {
+          "id": "H1.9",
+          "name": "Business Associate Contracts",
+          "requirements": [
+            {
+              "id": "H1.9.1",
+              "level": ["L1"],
+              "description": "Obtain satisfactory assurances in writing that business associates will appropriately safeguard ePHI",
+              "hipaa_reference": "§ 164.308(b)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.14.3"],
+              "implementation_specification": "Written Contract"
+            },
+            {
+              "id": "H1.9.2",
+              "level": ["L1"],
+              "description": "Ensure business associate contracts include provisions for reporting security incidents and implementing safeguards",
+              "hipaa_reference": "§ 164.308(b)(3)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.14.4"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H2",
+      "name": "Physical Safeguards",
+      "description": "Physical measures, policies, and procedures to protect electronic information systems and related buildings and equipment from natural and environmental hazards and unauthorized intrusion",
+      "based_on": "45 CFR § 164.310",
+      "owasp_mapping": ["V14-Configuration"],
+      "sections": [
+        {
+          "id": "H2.1",
+          "name": "Facility Access Controls",
+          "requirements": [
+            {
+              "id": "H2.1.1",
+              "level": ["L1"],
+              "description": "Implement policies and procedures to limit physical access to electronic information systems and facilities housing them, while ensuring properly authorized access",
+              "hipaa_reference": "§ 164.310(a)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": [],
+              "asvs_coverage": "none",
+              "implementation_specification": "Standard",
+              "mapping_note": "CORRECTED: Was v4.0.3-14.2.7 (invalid). Physical facility access controls are out of scope for ASVS 4.0.3, which focuses on application security. This is a HIPAA-specific organizational requirement."
+            },
+            {
+              "id": "H2.1.2",
+              "level": ["L2"],
+              "description": "Establish procedures to control and validate facility access based on role or function",
+              "hipaa_reference": "§ 164.310(a)(2)(ii)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": [],
+              "asvs_coverage": "none",
+              "implementation_specification": "Facility Security Plan",
+              "mapping_note": "CORRECTED: Was v4.0.3-14.2.7 (invalid). Same as H2.1.1 - physical security is out of ASVS scope."
+            },
+            {
+              "id": "H2.1.3",
+              "level": ["L2"],
+              "description": "Implement procedures to control physical access to facilities and verify access authorizations before granting physical access",
+              "hipaa_reference": "§ 164.310(a)(2)(iii)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": [],
+              "asvs_coverage": "none",
+              "implementation_specification": "Access Control and Validation Procedures",
+              "mapping_note": "CORRECTED: Was v4.0.3-14.2.7 (invalid). Same as H2.1.1 - physical security is out of ASVS scope."
+            }
+          ]
+        },
+        {
+          "id": "H2.2",
+          "name": "Workstation Use",
+          "requirements": [
+            {
+              "id": "H2.2.1",
+              "level": ["L1"],
+              "description": "Implement policies and procedures specifying proper functions to be performed, manner of performance, and physical attributes of surroundings for workstations accessing ePHI",
+              "hipaa_reference": "§ 164.310(b)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-14.2.1"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        },
+        {
+          "id": "H2.3",
+          "name": "Workstation Security",
+          "requirements": [
+            {
+              "id": "H2.3.1",
+              "level": ["L1"],
+              "description": "Implement physical safeguards for all workstations accessing ePHI to restrict access to authorized users",
+              "hipaa_reference": "§ 164.310(c)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-14.2.1"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        },
+        {
+          "id": "H2.4",
+          "name": "Device and Media Controls",
+          "requirements": [
+            {
+              "id": "H2.4.1",
+              "level": ["L1"],
+              "description": "Implement policies and procedures governing receipt and removal of hardware and electronic media containing ePHI",
+              "hipaa_reference": "§ 164.310(d)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-8.3.4"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H2.4.2",
+              "level": ["L1"],
+              "description": "Implement policies and procedures to address final disposition of ePHI and hardware/media on which it is stored",
+              "hipaa_reference": "§ 164.310(d)(2)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-8.3.4", "v4.0.3-8.3.6"],
+              "implementation_specification": "Disposal"
+            },
+            {
+              "id": "H2.4.3",
+              "level": ["L2"],
+              "description": "Implement procedures for removal of ePHI from electronic media before media is made available for reuse",
+              "hipaa_reference": "§ 164.310(d)(2)(ii)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-8.3.4"],
+              "implementation_specification": "Media Reuse"
+            },
+            {
+              "id": "H2.4.4",
+              "level": ["L2"],
+              "description": "Maintain record of movements of hardware and media and person responsible for movement",
+              "hipaa_reference": "§ 164.310(d)(2)(iii)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-7.1.2"],
+              "implementation_specification": "Accountability"
+            },
+            {
+              "id": "H2.4.5",
+              "level": ["L2"],
+              "description": "Create retrievable, exact copy of ePHI before movement of equipment",
+              "hipaa_reference": "§ 164.310(d)(2)(iv)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-8.3.4"],
+              "implementation_specification": "Data Backup and Storage"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H3",
+      "name": "Technical Safeguards",
+      "description": "Technology and policy and procedures for its use that protect ePHI and control access to it",
+      "based_on": "45 CFR § 164.312",
+      "owasp_mapping": ["V2-Authentication", "V3-Session Management", "V4-Access Control", "V6-Cryptography", "V7-Error Handling and Logging", "V8-Data Protection"],
+      "sections": [
+        {
+          "id": "H3.1",
+          "name": "Access Control",
+          "requirements": [
+            {
+              "id": "H3.1.1",
+              "level": ["L1"],
+              "description": "Implement technical policies and procedures for electronic information systems that maintain ePHI to allow access only to authorized persons or software programs",
+              "hipaa_reference": "§ 164.312(a)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-4.1.1", "v4.0.3-4.1.2"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H3.1.2",
+              "level": ["L1"],
+              "description": "Assign unique name and/or number for identifying and tracking user identity",
+              "hipaa_reference": "§ 164.312(a)(2)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-2.2.1"],
+              "implementation_specification": "Unique User Identification"
+            },
+            {
+              "id": "H3.1.3",
+              "level": ["L1"],
+              "description": "Establish procedures for emergency access to ePHI",
+              "hipaa_reference": "§ 164.312(a)(2)(ii)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-4.3.3"],
+              "implementation_specification": "Emergency Access Procedure"
+            },
+            {
+              "id": "H3.1.4",
+              "level": ["L2"],
+              "description": "Implement procedures that terminate electronic session after predetermined time of inactivity",
+              "hipaa_reference": "§ 164.312(a)(2)(iii)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-3.3.1", "v4.0.3-3.3.2"],
+              "implementation_specification": "Automatic Logoff"
+            },
+            {
+              "id": "H3.1.5",
+              "level": ["L2"],
+              "description": "Implement mechanism to encrypt and decrypt ePHI",
+              "hipaa_reference": "§ 164.312(a)(2)(iv)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-6.2.1", "v4.0.3-8.1.1"],
+              "implementation_specification": "Encryption and Decryption"
+            }
+          ]
+        },
+        {
+          "id": "H3.2",
+          "name": "Audit Controls",
+          "requirements": [
+            {
+              "id": "H3.2.1",
+              "level": ["L1"],
+              "description": "Implement hardware, software, and procedural mechanisms to record and examine activity in information systems containing or using ePHI",
+              "hipaa_reference": "§ 164.312(b)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-7.1.1", "v4.0.3-7.1.2", "v4.0.3-7.2.1"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        },
+        {
+          "id": "H3.3",
+          "name": "Integrity",
+          "requirements": [
+            {
+              "id": "H3.3.1",
+              "level": ["L1"],
+              "description": "Implement policies and procedures to protect ePHI from improper alteration or destruction",
+              "hipaa_reference": "§ 164.312(c)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-8.2.1"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H3.3.2",
+              "level": ["L2"],
+              "description": "Implement electronic mechanisms to corroborate ePHI has not been altered or destroyed in unauthorized manner",
+              "hipaa_reference": "§ 164.312(c)(2)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-8.2.2", "v4.0.3-6.2.3"],
+              "implementation_specification": "Mechanism to Authenticate ePHI"
+            }
+          ]
+        },
+        {
+          "id": "H3.4",
+          "name": "Person or Entity Authentication",
+          "requirements": [
+            {
+              "id": "H3.4.1",
+              "level": ["L1"],
+              "description": "Implement procedures to verify that person or entity seeking access to ePHI is the one claimed",
+              "hipaa_reference": "§ 164.312(d)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-2.1.1", "v4.0.3-2.7.1"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        },
+        {
+          "id": "H3.5",
+          "name": "Transmission Security",
+          "requirements": [
+            {
+              "id": "H3.5.1",
+              "level": ["L1"],
+              "description": "Implement technical security measures to guard against unauthorized access to ePHI transmitted over electronic communications network",
+              "hipaa_reference": "§ 164.312(e)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-9.1.1", "v4.0.3-9.1.2"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H3.5.2",
+              "level": ["L2"],
+              "description": "Implement security measures to ensure electronically transmitted ePHI is not improperly modified without detection until disposed",
+              "hipaa_reference": "§ 164.312(e)(2)(i)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-9.1.3", "v4.0.3-6.2.3"],
+              "implementation_specification": "Integrity Controls"
+            },
+            {
+              "id": "H3.5.3",
+              "level": ["L2"],
+              "description": "Implement mechanism to encrypt ePHI whenever deemed appropriate",
+              "hipaa_reference": "§ 164.312(e)(2)(ii)",
+              "requirement_type": "Addressable",
+              "owasp_asvs_mapping": ["v4.0.3-6.2.1", "v4.0.3-9.1.2"],
+              "implementation_specification": "Encryption"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H4",
+      "name": "Organizational Requirements",
+      "description": "Requirements for covered entity relationships with business associates and requirements for group health plans",
+      "based_on": "45 CFR § 164.314",
+      "owasp_mapping": ["V1-Architecture", "V14-Configuration"],
+      "sections": [
+        {
+          "id": "H4.1",
+          "name": "Business Associate Contracts or Other Arrangements",
+          "requirements": [
+            {
+              "id": "H4.1.1",
+              "level": ["L1"],
+              "description": "Contract must provide that business associate will implement administrative, physical, and technical safeguards that reasonably protect ePHI confidentiality, integrity, and availability",
+              "hipaa_reference": "§ 164.314(a)(2)(i)(A)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.14.3"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H4.1.2",
+              "level": ["L1"],
+              "description": "Contract must provide that business associate will ensure any subcontractors it involves agree to same restrictions and conditions",
+              "hipaa_reference": "§ 164.314(a)(2)(i)(B)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.14.4"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H4.1.3",
+              "level": ["L1"],
+              "description": "Contract must provide that business associate will report to covered entity any security incident of which it becomes aware",
+              "hipaa_reference": "§ 164.314(a)(2)(i)(C)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-7.3.1"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H5",
+      "name": "Policies, Procedures, and Documentation",
+      "description": "Requirements for implementing and maintaining policies, procedures, and documentation of security measures",
+      "based_on": "45 CFR § 164.316",
+      "owasp_mapping": ["V1-Architecture", "V14-Configuration"],
+      "sections": [
+        {
+          "id": "H5.1",
+          "name": "Policies and Procedures",
+          "requirements": [
+            {
+              "id": "H5.1.1",
+              "level": ["L1"],
+              "description": "Implement reasonable and appropriate policies and procedures to comply with security standards, implementation specifications, and other requirements",
+              "hipaa_reference": "§ 164.316(a)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.14.1"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        },
+        {
+          "id": "H5.2",
+          "name": "Documentation",
+          "requirements": [
+            {
+              "id": "H5.2.1",
+              "level": ["L1"],
+              "description": "Maintain written security policies and procedures and documentation of required actions, activities, or assessments",
+              "hipaa_reference": "§ 164.316(b)(1)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.1.6"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H5.2.2",
+              "level": ["L1"],
+              "description": "Retain documentation for 6 years from date of creation or last effective date, whichever is later",
+              "hipaa_reference": "§ 164.316(b)(2)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.1.7"],
+              "implementation_specification": "Time Limit"
+            },
+            {
+              "id": "H5.2.3",
+              "level": ["L1"],
+              "description": "Make documentation available to workforce members responsible for implementing procedures",
+              "hipaa_reference": "§ 164.316(b)(2)(ii)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.1.6"],
+              "implementation_specification": "Availability"
+            },
+            {
+              "id": "H5.2.4",
+              "level": ["L1"],
+              "description": "Review documentation periodically and update as needed in response to environmental or operational changes",
+              "hipaa_reference": "§ 164.316(b)(2)(iii)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.14.3"],
+              "implementation_specification": "Updates",
+              "mapping_note": "CORRECTED: Was v4.0.3-1.14.7 (invalid). Now maps to V1.14.3 (build pipeline warnings) as closest match for periodic review and updates."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H6",
+      "name": "Breach Notification",
+      "description": "Requirements for notifying individuals, media, and the Secretary of breaches of unsecured protected health information",
+      "based_on": "45 CFR § 164 Subpart D",
+      "owasp_mapping": ["V7-Error Handling and Logging"],
+      "sections": [
+        {
+          "id": "H6.1",
+          "name": "Notification to Individuals",
+          "requirements": [
+            {
+              "id": "H6.1.1",
+              "level": ["L1"],
+              "description": "Notify affected individuals of breach of unsecured protected health information without unreasonable delay and no later than 60 days after discovery",
+              "hipaa_reference": "§ 164.404(a)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-7.3.3"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H6.1.2",
+              "level": ["L1"],
+              "description": "Notification must include description of breach, types of information involved, steps individuals should take, what entity is doing, and contact information",
+              "hipaa_reference": "§ 164.404(c)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-7.3.3"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        },
+        {
+          "id": "H6.2",
+          "name": "Notification to the Secretary",
+          "requirements": [
+            {
+              "id": "H6.2.1",
+              "level": ["L1"],
+              "description": "For breaches involving 500 or more individuals, notify Secretary without unreasonable delay and no later than 60 days after discovery",
+              "hipaa_reference": "§ 164.408(a)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-7.3.3"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H6.2.2",
+              "level": ["L1"],
+              "description": "For breaches involving fewer than 500 individuals, notify Secretary annually within 60 days of end of calendar year",
+              "hipaa_reference": "§ 164.408(b)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-7.3.3"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H7",
+      "name": "Privacy Rule - General Requirements",
+      "description": "Standards for privacy of individually identifiable health information",
+      "based_on": "45 CFR § 164 Subpart E",
+      "owasp_mapping": ["V4-Access Control", "V8-Data Protection", "V12-File and Resources"],
+      "sections": [
+        {
+          "id": "H7.1",
+          "name": "Uses and Disclosures - General Rules",
+          "requirements": [
+            {
+              "id": "H7.1.1",
+              "level": ["L1"],
+              "description": "Not use or disclose protected health information except as permitted or required by Privacy Rule",
+              "hipaa_reference": "§ 164.502(a)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-4.1.1", "v4.0.3-8.1.1"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H7.1.2",
+              "level": ["L1"],
+              "description": "Use or disclose only minimum necessary PHI to accomplish intended purpose, when applicable",
+              "hipaa_reference": "§ 164.502(b)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-4.1.3", "v4.0.3-8.1.2"],
+              "implementation_specification": "Minimum Necessary"
+            },
+            {
+              "id": "H7.1.3",
+              "level": ["L1"],
+              "description": "Implement policies and procedures to limit use or disclosure to limited data set or minimum necessary",
+              "hipaa_reference": "§ 164.514(d)(3)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-4.1.3"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        },
+        {
+          "id": "H7.2",
+          "name": "Notice of Privacy Practices",
+          "requirements": [
+            {
+              "id": "H7.2.1",
+              "level": ["L1"],
+              "description": "Provide notice of privacy practices to individuals whose PHI is used or disclosed",
+              "hipaa_reference": "§ 164.520(a)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.2.1"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H7.2.2",
+              "level": ["L1"],
+              "description": "Notice must describe uses and disclosures, individual rights, entity duties, and complaint procedures",
+              "hipaa_reference": "§ 164.520(b)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.2.1"],
+              "implementation_specification": "Content"
+            }
+          ]
+        },
+        {
+          "id": "H7.3",
+          "name": "Individual Rights - Access",
+          "requirements": [
+            {
+              "id": "H7.3.1",
+              "level": ["L1"],
+              "description": "Provide individuals access to inspect and obtain copy of PHI in designated record set within 30 days",
+              "hipaa_reference": "§ 164.524(a)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-4.1.4", "v4.0.3-8.1.3"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H7.3.2",
+              "level": ["L1"],
+              "description": "Provide access in form and format requested if readily producible",
+              "hipaa_reference": "§ 164.524(c)(2)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-12.6.1"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        },
+        {
+          "id": "H7.4",
+          "name": "Individual Rights - Amendment",
+          "requirements": [
+            {
+              "id": "H7.4.1",
+              "level": ["L1"],
+              "description": "Permit individuals to request amendment of PHI in designated record set",
+              "hipaa_reference": "§ 164.526(a)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-8.1.3"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H7.4.2",
+              "level": ["L1"],
+              "description": "Act on amendment request within 60 days",
+              "hipaa_reference": "§ 164.526(b)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-8.1.3"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        },
+        {
+          "id": "H7.5",
+          "name": "Individual Rights - Accounting of Disclosures",
+          "requirements": [
+            {
+              "id": "H7.5.1",
+              "level": ["L1"],
+              "description": "Provide accounting of disclosures upon request within 60 days",
+              "hipaa_reference": "§ 164.528(a)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-7.1.2", "v4.0.3-7.2.2"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H7.5.2",
+              "level": ["L1"],
+              "description": "Accounting must include date, recipient, description, and purpose for disclosures in preceding 6 years",
+              "hipaa_reference": "§ 164.528(b)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-7.1.2", "v4.0.3-7.2.2"],
+              "implementation_specification": "Content"
+            }
+          ]
+        },
+        {
+          "id": "H7.6",
+          "name": "Administrative Requirements",
+          "requirements": [
+            {
+              "id": "H7.6.1",
+              "level": ["L1"],
+              "description": "Designate privacy official responsible for development and implementation of privacy policies and procedures",
+              "hipaa_reference": "§ 164.530(a)(1)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.1.4"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H7.6.2",
+              "level": ["L1"],
+              "description": "Train all workforce members on privacy policies and procedures",
+              "hipaa_reference": "§ 164.530(b)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.1.5"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H7.6.3",
+              "level": ["L1"],
+              "description": "Apply appropriate sanctions against workforce members who fail to comply with privacy policies",
+              "hipaa_reference": "§ 164.530(e)(1)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-1.1.7"],
+              "asvs_coverage": "partial",
+              "implementation_specification": "Standard",
+              "mapping_note": "CORRECTED: Was v4.0.3-1.1.8 (invalid - V1.1 only has 7 requirements). Now maps to V1.1.7 (availability of secure coding checklist/policy) as closest ASVS match. Note: HR sanctions are primarily organizational requirements with limited direct ASVS coverage."
+            },
+            {
+              "id": "H7.6.4",
+              "level": ["L1"],
+              "description": "Mitigate harmful effects of use or disclosure in violation of policies or requirements",
+              "hipaa_reference": "§ 164.530(f)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-7.3.2"],
+              "implementation_specification": "Standard"
+            }
+          ]
+        },
+        {
+          "id": "H7.7",
+          "name": "De-identification",
+          "requirements": [
+            {
+              "id": "H7.7.1",
+              "level": ["L1"],
+              "description": "Health information not individually identifiable if entity determines no reasonable basis exists for identification or expert determination confirms",
+              "hipaa_reference": "§ 164.514(a)-(b)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-8.3.4"],
+              "implementation_specification": "Standard"
+            },
+            {
+              "id": "H7.7.2",
+              "level": ["L1"],
+              "description": "Remove 18 specific identifiers to achieve safe harbor de-identification",
+              "hipaa_reference": "§ 164.514(b)(2)(i)",
+              "requirement_type": "Required",
+              "owasp_asvs_mapping": ["v4.0.3-8.3.4"],
+              "implementation_specification": "Safe Harbor Method"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "owasp_asvs_mapping_summary": {
+    "description": "Comprehensive mapping between HIPAA requirements and OWASP ASVS 4.0.3 verification requirements",
+    "asvs_chapters_covered": [
+      {
+        "chapter": "V1",
+        "name": "Architecture, Design and Threat Modeling",
+        "hipaa_categories": ["H1-Administrative Safeguards", "H4-Organizational Requirements", "H5-Policies and Procedures", "H7-Privacy"]
+      },
+      {
+        "chapter": "V2",
+        "name": "Authentication",
+        "hipaa_categories": ["H1-Administrative Safeguards (Password Management)", "H3-Technical Safeguards (Authentication)"]
+      },
+      {
+        "chapter": "V3",
+        "name": "Session Management",
+        "hipaa_categories": ["H3-Technical Safeguards (Automatic Logoff)"]
+      },
+      {
+        "chapter": "V4",
+        "name": "Access Control",
+        "hipaa_categories": ["H1-Administrative Safeguards (Information Access)", "H3-Technical Safeguards (Access Control)", "H7-Privacy (Uses and Disclosures)"]
+      },
+      {
+        "chapter": "V6",
+        "name": "Stored Cryptography",
+        "hipaa_categories": ["H3-Technical Safeguards (Encryption, Integrity, Transmission Security)"]
+      },
+      {
+        "chapter": "V7",
+        "name": "Error Handling and Logging",
+        "hipaa_categories": ["H1-Administrative Safeguards (Audit, Incident Response)", "H3-Technical Safeguards (Audit Controls)", "H6-Breach Notification", "H7-Privacy (Accounting)"]
+      },
+      {
+        "chapter": "V8",
+        "name": "Data Protection",
+        "hipaa_categories": ["H1-Administrative Safeguards (Backup)", "H2-Physical Safeguards (Media)", "H3-Technical Safeguards (Encryption)", "H7-Privacy (PHI Protection, De-identification)"]
+      },
+      {
+        "chapter": "V9",
+        "name": "Communication",
+        "hipaa_categories": ["H3-Technical Safeguards (Transmission Security)"]
+      },
+      {
+        "chapter": "V10",
+        "name": "Malicious Code",
+        "hipaa_categories": ["H1-Administrative Safeguards (Malware Protection)"]
+      },
+      {
+        "chapter": "V12",
+        "name": "Files and Resources",
+        "hipaa_categories": ["H7-Privacy (Access to PHI)"]
+      },
+      {
+        "chapter": "V14",
+        "name": "Configuration",
+        "hipaa_categories": ["H1-Administrative Safeguards (Risk Management)", "H2-Physical Safeguards", "H4-Organizational Requirements", "H5-Policies and Procedures"]
+      }
+    ],
+    "coverage_notes": [
+      "HIPAA has unique requirements for Business Associate Agreements (BAA) that don't directly map to ASVS but are critical for compliance",
+      "Physical safeguards in HIPAA (H2) have limited ASVS coverage as ASVS focuses on application security",
+      "HIPAA Privacy Rule (H7) requirements extend beyond typical application security to organizational policy",
+      "Breach notification requirements (H6) align with incident response logging but have specific regulatory timelines",
+      "HIPAA distinguishes between 'Required' and 'Addressable' specifications; ASVS uses L1/L2/L3 levels"
+    ]
+  },
+  "compliance_guidance": {
+    "using_this_mapping": [
+      "Organizations can use this mapping to demonstrate how application security controls support HIPAA compliance",
+      "Development teams can reference OWASP ASVS verification requirements to implement HIPAA technical safeguards",
+      "Security assessors can use both frameworks together for comprehensive evaluation",
+      "Gap analysis can identify areas where additional HIPAA-specific controls are needed beyond ASVS"
+    ],
+    "limitations": [
+      "This mapping focuses on technical and procedural controls that can be implemented in applications",
+      "Organizational and policy requirements may need additional documentation beyond application security",
+      "Physical safeguards require facilities management beyond application scope",
+      "Business associate agreements and contracts are legal requirements separate from technical controls"
+    ],
+    "recommendations": [
+      "Implement all L1 requirements as baseline for HIPAA compliance",
+      "Conduct risk analysis to determine if L2/L3 controls are appropriate for your environment",
+      "Document how each ASVS control satisfies corresponding HIPAA requirements",
+      "Regular security assessments should cover both HIPAA and ASVS verification requirements",
+      "Maintain evidence of implementation for audit purposes"
+    ]
+  },
+  "metadata": {
+    "created_date": "2025-10-22",
+    "corrected_date": "2025-10-22",
+    "hipaa_document_version": "March 2013",
+    "asvs_version_mapped": "4.0.3",
+    "total_hipaa_requirements": 76,
+    "total_asvs_mappings": 99,
+    "invalid_mappings_corrected": 6,
+    "asvs_coverage_gaps": 3,
+    "requirement_types": {
+      "required": 58,
+      "addressable": 18
+    }
+  }
+}

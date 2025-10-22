@@ -12,9 +12,10 @@ A Model Context Protocol (MCP) server that provides AI assistants with access to
 - **Smart Recommendations**: Get prioritized control recommendations based on your application context
 - **Search**: Find requirements by keyword or vulnerability type
 - **Category Overview**: See summaries of all ASVS categories
-- **Compliance Mapping**: Map ASVS requirements to PCI DSS, HIPAA, GDPR, SOX, and ISO 27001
+- **Compliance Mapping**: Map ASVS requirements to compliance frameworks with validated HIPAA mappings
 - **Gap Analysis**: Identify missing controls needed for compliance frameworks
 - **Compliance Impact**: Understand which regulations a security control helps satisfy
+- **HIPAA Integration**: 76 validated HIPAA Security Rule mappings to ASVS 5.0.0 requirements
 
 ## Installation
 
@@ -51,19 +52,24 @@ npm run build
 ```
 owasp-asvs-mcp-server/
 ├── src/
-│   └── index.ts                 # Main server code
+│   └── index.ts                          # Main server code (~1200 lines)
 ├── data/
-│   ├── asvs-5.0.0.json          # ASVS 5.0.0 requirements data
-│   ├── asvs-cwe-mapping.json    # Official CWE mappings from OWASP
-│   └── asvs-nist-mapping.json   # Official NIST 800-63B mappings from OWASP
+│   ├── asvs-5.0.0.json                   # ASVS 5.0.0 requirements (345 reqs)
+│   ├── asvs-5.0.0-hipaa-mapping.json     # Validated HIPAA mappings ✅
+│   ├── asvs-cwe-mapping.json             # Official CWE mappings from OWASP
+│   └── asvs-nist-mapping.json            # Official NIST 800-63B mappings
 ├── scripts/
-│   ├── update-asvs-data.js      # Update ASVS data from OWASP
-│   ├── parse-nist-mapping.cjs   # Parse NIST markdown to JSON
-│   └── benchmark-loading.js     # Performance benchmarking tool
-├── dist/                         # Compiled JavaScript (generated)
+│   ├── update-asvs-data.js               # Update ASVS from OWASP GitHub
+│   ├── parse-nist-mapping.cjs            # Parse NIST markdown to JSON
+│   ├── benchmark-loading.js              # Performance benchmarking
+│   ├── validate-asvs5-hipaa-mappings.js  # Validate HIPAA mappings
+│   └── test-hipaa-integration.js         # Test HIPAA integration
+├── dist/                                  # Compiled JavaScript (generated)
 ├── package.json
 ├── tsconfig.json
-└── README.md
+├── README.md
+├── CLAUDE.md                              # Claude Code instructions
+└── HIPAA_INTEGRATION.md                   # HIPAA integration docs
 ```
 
 ## Data Sources
@@ -87,11 +93,20 @@ This MCP server uses **official OWASP ASVS data and mappings**:
 - **Contains**: 52 mappings from ASVS requirements to NIST 800-63B authentication guidelines
 - **Status**: Official OWASP mapping
 
-### Compliance Framework Mappings ⚠️ Illustrative Only
-- **Frameworks**: PCI DSS, HIPAA, GDPR, SOX, ISO 27001
+### HIPAA Mappings ✅ Validated
+- **Source**: Validated HIPAA Security Rule mappings (45 CFR Parts 164.308, 164.312, etc.)
+- **File**: `data/asvs-5.0.0-hipaa-mapping.json`
+- **Contains**: 76 HIPAA requirements mapped to 48 ASVS 5.0.0 requirements (102 total mappings)
+- **Coverage**: 94.7% full coverage, 1.3% partial, 3.9% no coverage (physical security only)
+- **Status**: Validated - All mappings verified against ASVS 5.0.0 and HIPAA Security Rule
+- **Date**: Created 2025-10-22
+- **See**: `HIPAA_INTEGRATION.md` for detailed documentation
+
+### Other Compliance Framework Mappings ⚠️ Illustrative Only
+- **Frameworks**: PCI DSS, GDPR, SOX, ISO 27001
 - **Status**: **Not official** - Illustrative examples for demonstration purposes only
-- **Important**: These mappings are conceptually reasonable but have NOT been validated by OWASP or compliance auditors
-- **Recommendation**: For production compliance work, use [OpenCRE](https://www.opencre.org) or consult qualified compliance professionals
+- **Important**: These mappings are conceptually reasonable but have NOT been validated by compliance auditors
+- **Recommendation**: For production compliance work, use [OpenCRE](https://www.opencre.org) or consult qualified compliance professionals. HIPAA mappings (above) are an exception - they have been validated.
 
 ### Updating Data
 
@@ -367,17 +382,19 @@ Once configured in Claude Desktop, you can ask questions like:
 
 **Compliance Questions:**
 - "We're building a payment processing app. Which ASVS requirements help us meet PCI DSS?"
-- "Show me all HIPAA-related security controls in ASVS"
+- "Show me all HIPAA-related security controls in ASVS Level 1" (uses validated HIPAA mappings ✅)
+- "What HIPAA Security Rule sections does ASVS V6.2.1 satisfy?" (validated mappings ✅)
 - "Our company needs SOX and ISO 27001 compliance. What's the gap between L1 and L2?"
 - "If I implement ASVS requirement 9.1.1, which compliance frameworks does it satisfy?"
 - "We've implemented basic auth controls. Run a gap analysis for GDPR compliance at L2"
-- "What percentage of PCI DSS requirements do we currently meet?"
+- "What percentage of HIPAA requirements do we currently meet?" (uses validated mappings ✅)
 
 **Real-World Scenarios:**
-- "We're a healthcare startup. Map our path from no security controls to HIPAA compliance"
+- "We're a healthcare startup. Map our path from no security controls to HIPAA compliance" (validated ✅)
 - "Generate a compliance roadmap for a fintech app targeting PCI DSS Level 1"
 - "We have L1 covered. Prioritize L2 requirements by compliance impact for PCI and SOX"
 - "Which ASVS controls give us the most compliance coverage across multiple frameworks?"
+- "Show me the 48 ASVS requirements that satisfy HIPAA Security Rule" (validated ✅)
 
 ## Data Source
 
@@ -443,9 +460,13 @@ The server maps ASVS requirements to the following compliance frameworks:
 - Requirement sections: 3.x (Data Protection), 4.x (Encryption), 6.x (Secure Development), 8.x (Access Control), 10.x (Logging)
 - Use case: Payment processing, e-commerce, financial services
 
-### HIPAA (Health Insurance Portability and Accountability Act)
-- Security Rule sections: 164.308 (Administrative), 164.312 (Technical), 164.316 (Policies)
-- Use case: Healthcare applications, medical records, patient data
+### HIPAA (Health Insurance Portability and Accountability Act) ✅ Validated
+- **Security Rule sections**: 164.308 (Administrative), 164.312 (Technical), 164.316 (Policies), 164.502/514 (Use & Disclosure)
+- **Mappings**: 76 HIPAA requirements → 48 ASVS 5.0.0 controls (102 total mappings)
+- **Coverage**: 94.7% of HIPAA requirements have full ASVS coverage
+- **Use case**: Healthcare applications, medical records, patient data, PHI (Protected Health Information)
+- **Validation**: All mappings verified against HIPAA Security Rule (45 CFR)
+- **Documentation**: See `HIPAA_INTEGRATION.md` for complete details
 
 ### GDPR (General Data Protection Regulation)
 - Articles: Article 32 (Security of Processing), Article 25 (Privacy by Design)
@@ -507,12 +528,23 @@ Contributions are welcome! To contribute:
 5. Submit a pull request
 
 The server can be enhanced with:
-- Additional compliance framework mappings (NIST 800-53, CSA CCM, etc.)
+- Additional validated compliance framework mappings (NIST 800-53, CSA CCM, ISO 27002, etc.)
 - More sophisticated prioritization algorithms
-- Integration with CVE/CWE databases
+- Integration with OpenCRE for additional compliance mappings
 - Custom risk scoring based on threat modeling
 - Automated compliance report generation
 - Real-time compliance status tracking
+- HIPAA-specific tools (e.g., `get_hipaa_requirements` for reverse lookup)
+
+### Recent Enhancements
+
+**Version 0.4.0 (2025-10-22):**
+- ✅ ASVS 5.0.0 integration (345 requirements, 17 chapters)
+- ✅ Validated HIPAA Security Rule mappings (76 requirements, 102 mappings)
+- ✅ Bidirectional HIPAA ↔ ASVS indexing for O(1) lookups
+- ✅ Official CWE mappings (214 mappings)
+- ✅ Official NIST 800-63B mappings (52 mappings)
+- ✅ Comprehensive validation scripts for data integrity
 
 ## License
 
@@ -521,5 +553,8 @@ MIT
 ## Resources
 
 - [OWASP ASVS Official Site](https://owasp.org/www-project-application-security-verification-standard/)
-- [ASVS GitHub Repository](https://github.com/OWASP/ASVS)
+- [ASVS GitHub Repository](https://github.com/OWASP/ASVS) - Source for official mappings
 - [Model Context Protocol Documentation](https://modelcontextprotocol.io/)
+- [HIPAA Security Rule](https://www.hhs.gov/hipaa/for-professionals/security/index.html) - Official HHS documentation
+- [OpenCRE](https://www.opencre.org) - Additional compliance mappings and cross-references
+- [HIPAA Integration Documentation](HIPAA_INTEGRATION.md) - Detailed HIPAA mapping documentation

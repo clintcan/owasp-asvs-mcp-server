@@ -6,6 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is an MCP (Model Context Protocol) server that provides AI assistants with access to OWASP ASVS (Application Security Verification Standard) data. The server exposes 9 tools for querying security requirements, generating recommendations, and mapping compliance frameworks.
 
+**Current Version**: 0.4.0 (2025-10-22)
+**ASVS Version**: 5.0.0 (345 requirements, 17 chapters)
+**HIPAA Mappings**: ✅ Validated - 76 HIPAA requirements, 102 mappings, 94.7% coverage
 **Git Repository**: https://github.com/clintcan/owasp-asvs-mcp-server
 
 ## Installation from Repository
@@ -117,6 +120,9 @@ All server logic is in `src/index.ts` (~1200 lines). The server uses:
 
 **ASVSServer class** (lines 102-1197):
 - `loadASVSData()` - Loads from local file (ASVS 5.0.0), falls back to GitHub remote fetch, then embedded mock data
+- `loadHIPAAMappings()` - Loads validated HIPAA Security Rule mappings (NEW in 0.4.0)
+- `buildHIPAAIndex()` - Creates bidirectional ASVS ↔ HIPAA index for O(1) lookups (NEW in 0.4.0)
+- `enrichASVSWithHIPAAMappings()` - Populates compliance.hipaa field in ASVS requirements (NEW in 0.4.0)
 - `parseASVSData()` - Transforms OWASP JSON format into internal structure
 - `setupHandlers()` (line 611) - Registers ListTools and CallTool request handlers
 - 9 tool implementation methods (lines 822-1190)
@@ -168,15 +174,24 @@ All 9 tools follow this pattern:
 
 **Compliance mapping**:
 - Requirements have `compliance` object with arrays of framework-specific control IDs
+- **HIPAA mappings are validated** (✅): 76 HIPAA requirements, 48 ASVS requirements, 102 total mappings
+- Other frameworks (PCI DSS, GDPR, SOX, ISO 27001) are illustrative examples only (⚠️)
 - Gap analysis calculates coverage percentage per framework
 - Bidirectional mapping: ASVS→Compliance and Compliance→ASVS
+- HIPAA uses O(1) Map-based indexing for fast lookups
 
 ## Key Files
 
-- `src/index.ts` - Entire server implementation
+- `src/index.ts` - Entire server implementation (~1200 lines)
+- `data/asvs-5.0.0.json` - ASVS 5.0.0 requirements (345 requirements, 17 chapters)
+- `data/asvs-5.0.0-hipaa-mapping.json` - ✅ Validated HIPAA mappings (76 reqs, 102 mappings)
+- `data/asvs-cwe-mapping.json` - ✅ Official OWASP CWE mappings (214 mappings)
+- `data/asvs-nist-mapping.json` - ✅ Official OWASP NIST 800-63B mappings (52 mappings)
 - `package.json` - Dependencies: MCP SDK, node-fetch; Scripts: build, watch, dev
 - `tsconfig.json` - ES2022 target, Node16 modules, strict mode enabled
 - `README.md` - User-facing documentation with tool descriptions and usage examples
+- `HIPAA_INTEGRATION.md` - Detailed HIPAA mapping documentation
+- `CLAUDE.md` - This file - Claude Code instructions
 
 ## Development Notes
 
@@ -190,6 +205,14 @@ All 9 tools follow this pattern:
 - **Fallback 1**: Remote fetch from GitHub OWASP/ASVS repository (ASVS 5.0.0)
 - **Fallback 2**: Embedded mock data with 7 categories (lines 324-608)
 - Data source is indicated in `_meta.data_source` field of all responses
+
+**HIPAA data loading** (NEW in 0.4.0):
+- **Source**: Local file (`data/asvs-5.0.0-hipaa-mapping.json`)
+- **Load time**: ~2-5ms (76 HIPAA requirements, 102 mappings)
+- **Indexing**: ~1-2ms to build bidirectional ASVS ↔ HIPAA map
+- **Total overhead**: ~5-10ms on server startup (negligible)
+- **Graceful degradation**: Server starts even if HIPAA file is missing
+- **Test script**: `node scripts/test-hipaa-integration.js`
 
 **Updating ASVS data**:
 - Local file is included in the repository
@@ -220,6 +243,12 @@ To change tiers, modify the constants at the top of `src/index.ts` (lines 23-29)
 
 **Compliance framework keys**:
 Use snake_case internally: `pci_dss`, `hipaa`, `gdpr`, `sox`, `iso27001`
+
+**Compliance framework mapping status**:
+- ✅ **HIPAA**: Validated - 76 requirements, 102 mappings, 94.7% coverage (see `HIPAA_INTEGRATION.md`)
+- ✅ **CWE**: Official OWASP mappings - 214 mappings
+- ✅ **NIST 800-63B**: Official OWASP mappings - 52 mappings
+- ⚠️ **PCI DSS, GDPR, SOX, ISO 27001**: Illustrative examples only - not validated
 
 **Adding new tools**:
 1. Add tool definition in `setupHandlers()` ListTools response (lines 613-781)

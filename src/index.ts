@@ -56,6 +56,31 @@ interface ASVSCategory {
   requirements: ASVSRequirement[];
 }
 
+// Types for HIPAA mapping data
+interface HIPAARequirement {
+  id: string;
+  level: string[];
+  description: string;
+  hipaa_reference: string;
+  requirement_type: string;
+  owasp_asvs_mapping: string[];
+  implementation_specification?: string;
+  asvs_coverage?: string;
+  mapping_note?: string;
+}
+
+interface HIPAASection {
+  section_id: string;
+  section_title: string;
+  requirements: HIPAARequirement[];
+}
+
+interface HIPAACategory {
+  category_id: string;
+  category_name: string;
+  sections: HIPAASection[];
+}
+
 // Tool argument interfaces for type safety
 interface GetRequirementsByLevelArgs {
   level: number;
@@ -142,11 +167,18 @@ class ASVSServer {
   private dataLoaded: boolean = false;
   private opencreClient: OpenCREClient | null = null;
 
+  // HIPAA mapping data
+  private hipaaData: HIPAACategory[] = [];
+  private hipaaLoaded: boolean = false;
+
   // Performance indexes for O(1) lookups
   private requirementIndex: Map<string, { requirement: ASVSRequirement; category: ASVSCategory }> = new Map();
   private categoryIndex: Map<string, ASVSCategory> = new Map();
   private searchIndex: Map<string, Set<string>> = new Map();
   private dataSource: 'local' | 'remote' | 'mock' = 'local';
+
+  // HIPAA bidirectional index: ASVS ID → HIPAA requirements that map to it
+  private asvsToHipaaIndex: Map<string, HIPAARequirement[]> = new Map();
 
   constructor() {
     this.server = new Server(
@@ -224,6 +256,102 @@ class ASVSServer {
     return { cwe: cweMappings, nist: nistMappings };
   }
 
+  /**
+   * Load HIPAA to ASVS 5.0.0 mapping data
+   * This provides validated mappings from HIPAA requirements to ASVS controls
+   */
+  private async loadHIPAAMappings(): Promise<void> {
+    if (this.hipaaLoaded) return;
+
+    try {
+      const hipaaFilePath = join(__dirname, '..', 'data', 'asvs-5.0.0-hipaa-mapping.json');
+
+      try {
+        // Security: Check file size before reading
+        const stats = statSync(hipaaFilePath);
+        if (stats.size > MAX_FILE_SIZE) {
+          throw new Error(`HIPAA mapping file exceeds maximum allowed size (${MAX_FILE_SIZE} bytes)`);
+        }
+
+        const fileContent = readFileSync(hipaaFilePath, 'utf-8');
+        const data = JSON.parse(fileContent);
+
+        // Store the complete HIPAA data
+        this.hipaaData = data.categories || [];
+
+        // Build bidirectional index for quick ASVS → HIPAA lookups
+        this.buildHIPAAIndex();
+
+        // Also populate the compliance.hipaa field in ASVS requirements
+        this.enrichASVSWithHIPAAMappings();
+
+        console.error(`Loaded HIPAA mappings: ${this.countHIPAARequirements()} HIPAA requirements mapped to ASVS 5.0.0`);
+        this.hipaaLoaded = true;
+      } catch (fileError) {
+        console.error("HIPAA mapping file not found, HIPAA compliance tools will have limited data:", fileError);
+      }
+    } catch (error) {
+      console.error("Error loading HIPAA mappings:", error);
+    }
+  }
+
+  /**
+   * Build index: ASVS requirement ID → HIPAA requirements that reference it
+   */
+  private buildHIPAAIndex(): void {
+    this.asvsToHipaaIndex.clear();
+
+    for (const category of this.hipaaData) {
+      for (const section of category.sections) {
+        for (const hipaaReq of section.requirements) {
+          // Each HIPAA requirement may map to multiple ASVS requirements
+          for (const asvsMapping of hipaaReq.owasp_asvs_mapping || []) {
+            // Convert "v5.0.0-1.2.3" to "V1.2.3"
+            const asvsId = 'V' + asvsMapping.replace('v5.0.0-', '');
+
+            if (!this.asvsToHipaaIndex.has(asvsId)) {
+              this.asvsToHipaaIndex.set(asvsId, []);
+            }
+            this.asvsToHipaaIndex.get(asvsId)!.push(hipaaReq);
+          }
+        }
+      }
+    }
+
+    console.error(`Built HIPAA index: ${this.asvsToHipaaIndex.size} ASVS requirements have HIPAA mappings`);
+  }
+
+  /**
+   * Enrich ASVS requirements with HIPAA compliance references
+   */
+  private enrichASVSWithHIPAAMappings(): void {
+    for (const category of this.asvsData) {
+      for (const asvsReq of category.requirements) {
+        const hipaaRefs = this.asvsToHipaaIndex.get(asvsReq.id);
+        if (hipaaRefs && hipaaRefs.length > 0) {
+          if (!asvsReq.compliance) {
+            asvsReq.compliance = {};
+          }
+          // Store HIPAA requirement IDs and references
+          asvsReq.compliance.hipaa = hipaaRefs.map(h => h.hipaa_reference);
+        }
+      }
+    }
+  }
+
+  /**
+   * Count total HIPAA requirements
+   */
+  private countHIPAARequirements(): number {
+    let count = 0;
+    for (const category of this.hipaaData) {
+      for (const section of category.sections) {
+        count += section.requirements.length;
+      }
+    }
+    return count;
+  }
+
   private async loadASVSData(): Promise<void> {
     if (this.dataLoaded) return;
 
@@ -279,6 +407,9 @@ class ASVSServer {
     this.dataLoaded = true;
     // Build performance indexes
     this.buildIndexes();
+
+    // Load HIPAA mappings after ASVS data is loaded
+    await this.loadHIPAAMappings();
   }
 
   private buildIndexes(): void {
@@ -350,10 +481,13 @@ class ASVSServer {
           _meta: {
             data_source: this.dataSource,
             version: '5.0.0',
+            hipaa_mappings_loaded: this.hipaaLoaded,
+            hipaa_requirements_count: this.hipaaLoaded ? this.countHIPAARequirements() : 0,
             mappings: {
               cwe_source: 'OWASP ASVS 5.0 official CWE mapping',
               nist_source: 'OWASP ASVS 5.0 official NIST 800-63B mapping',
-              compliance_note: 'Compliance framework mappings (PCI DSS, HIPAA, GDPR, SOX, ISO 27001) are illustrative examples only and not official OWASP mappings. For validated mappings, consult OpenCRE (https://www.opencre.org) or qualified compliance professionals.'
+              hipaa_source: this.hipaaLoaded ? 'Validated HIPAA to ASVS 5.0.0 mappings (data/asvs-5.0.0-hipaa-mapping.json)' : 'Not loaded',
+              compliance_note: 'HIPAA mappings are validated and based on official HIPAA Security Rule requirements. Other compliance framework mappings (PCI DSS, GDPR, SOX, ISO 27001) are illustrative examples only. For additional validated mappings, consult OpenCRE (https://www.opencre.org) or qualified compliance professionals.'
             }
           }
         }, null, 2)
